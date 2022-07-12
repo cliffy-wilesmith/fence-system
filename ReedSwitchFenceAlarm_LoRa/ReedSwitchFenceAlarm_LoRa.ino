@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <string.h>
 #include <bluefairy.h>
 bluefairy::Scheduler scheduler;
 #define DEBUG true
@@ -25,9 +27,9 @@ int Alert_redPin=5;
 
 long int runtime = 20000;
 const long All_clear_interval= 30*(1000);   // in seconds
-const long Sensor_interval = 1*(100);                //  in milliseconds 
+const long Alert_interval = 50*(100);                //  in milliseconds 
 const int dt=500;
-const int Breach_duration=5*(1000);     //in seconds
+const int Breach_duration=3*(1000);     //in seconds
 
 // Assign Variables
 
@@ -49,13 +51,27 @@ int RightAlarm_lastState = LOW;
 int LeftAlarm_currentState;
 int LeftAlarm_lastState=LOW;
 int Alert_sent=LOW;
-
+int Val;
+int count=0;
+byte payload[2];
 
 bool ModuleState = false;
 
 void setup() {
+
   Serial1.begin(115200);
   SerialUSB.begin(115200);
+  while (!SerialUSB) {; }
+  while (!Serial1) {; }
+  SerialUSB.println("System online");    
+  //Setup up connection
+    
+  sendData("AT+CDEVEUI=" + String(DEVEUI), 3000, DEBUG);     //set DEVEUI
+  sendData("AT+CAPPEUI=" + String(APPEUI), 3000, DEBUG);    //set APPEUI
+  sendData("AT+CAPPKEY=" + String(APPKEY), 3000, DEBUG);   //set APPKEY
+  sendData("AT+CJOINMODE=0", 3000, DEBUG);                //set join mod "OTAA"
+  sendData("AT+CJOIN=1,0,10,1", 30000, DEBUG);           //join lorawan
+  SerialUSB.println("Done connecting");
 
   // pinMode
   pinMode(CentreSwitch_Pin_Right,INPUT_PULLDOWN);
@@ -65,19 +81,11 @@ void setup() {
   pinMode(Left_greenPin,OUTPUT);
   pinMode(Right_bluePin,OUTPUT);
   pinMode(Alarm_yellowPin,OUTPUT);
-  pinMode(Alert_redPin,OUTPUT);
-    
-  //Setup up connection
-    
-  //sendData("AT+CDEVEUI=" + String(DEVEUI), 3000, DEBUG);     //set DEVEUI
-  //sendData("AT+CAPPEUI=" + String(APPEUI), 3000, DEBUG);    //set APPEUI
-  //sendData("AT+CAPPKEY=" + String(APPKEY), 3000, DEBUG);   //set APPKEY
-  //sendData("AT+CJOINMODE=0", 3000, DEBUG);                //set join mod "OTAA"
-  //sendData("AT+CJOIN=1,0,10,1", 30000, DEBUG);           //join lorawan
+//  pinMode(Alert_redPin,OUTPUT);
   }
 
 void loop() {
-  
+//  digitalWrite(Alert_redPin,Alert_sent);
        // Reading sensor output
   CentreSwitchVal_Right=digitalRead(CentreSwitch_Pin_Right);
   CentreSwitchVal_Left=digitalRead(CentreSwitch_Pin_Left);
@@ -106,7 +114,9 @@ if (LeftAlarm_currentState == HIGH || RightAlarm_currentState == HIGH){         
   digitalWrite(Alarm_yellowPin,HIGH);
 }
 else{digitalWrite(Alarm_yellowPin,LOW);}
-digitalWrite(Alert_redPin,Alert_sent);
+
+
+//digitalWrite(Alert_redPin,Alert_sent);
         
 
                  //overall Alarm State
@@ -126,7 +136,7 @@ if (LeftAlarm_currentState !=LeftAlarm_lastState){
 
          //Alarm Logic      
              
-if (LeftAlarm_currentState == HIGH 
+if (LeftAlarm_currentState == HIGH                                                     //sends alert after timer
     && Alert_sent == LOW 
     && (millis()-startMillis_Left>Breach_duration ))
     {
@@ -140,41 +150,49 @@ if (RightAlarm_currentState == HIGH
       UpdateState("Alert");
       }
 
+if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )   //sending lora payload
+
+{ 
+         Val=30000;
+         count+=1;
+         Val+=count;
+         
+       if(RightAlarm_currentState == HIGH){Val+=1000;}
+       if(LeftAlarm_currentState == HIGH){Val+=2000;}
+  
+        payload[0] = highByte(Val);
+        payload[1]= lowByte(Val);
+        
+          
+        char msg[30] = "";
+        sprintf(msg, "AT+DTRX=1,2,2,%02x%02x", payload[0], payload[1]);
+        SerialUSB.println("Sending Alert........");
+        sendData((String)msg, 3000, DEBUG);
+        SerialUSB.println("Alert Sent");
+        previousMillis=millis();
+        }
+
+  
+
 if (LeftAlarm_currentState == LOW && LeftAlarm_currentState == LOW &&  Alert_sent == HIGH)
 {
   UpdateState("Alert");
   } 
 
+    
 
+      while (Serial1.available() > 0)
+    {
+        SerialUSB.write(Serial1.read());
+        yield();
+    }
+    while (SerialUSB.available() > 0)
+    {
+        Serial1.write(SerialUSB.read());
+        yield();
+    } 
 
-
-        //int Left_lora = LeftAlarm;
-        //int Right_lora= RightAlarm;
-
-        //char msg[30] = "";
-        //sprintf(msg, "AT+DTRX=1,2,2,%02x%02x", Left_lora, Right_lora);
-        //SerialUSB.println(msg);
-        //sendData((String)msg, 3000, DEBUG);}
-
-
- //unsigned long currentMillis = millis();
-
- 
-
-//while (Serial1.available() > 0)
-  //  {
-    //    SerialUSB.write(Serial1.read());
-      //  yield();
-    //}
-    //while (SerialUSB.available() > 0)
-    //{
-      //  Serial1.write(SerialUSB.read());
-       // yield();
-//    
 }
-
-
-
 void UpdateState(String Side){
  
   if (Side=="Right"){
@@ -188,17 +206,27 @@ void UpdateState(String Side){
             {startMillis_Left=millis();}  //check left side alarm state
  }
 
-  if (Side=="Alert")
-            {Alert_sent=!Alert_sent;}  //check right side alarm state
-            
-  
-}
+  if (Side=="Alert")  //check right side alarm state
+            {Alert_sent=!Alert_sent;
+            if(Alert_sent==LOW)
+            {
+              previousMillis=millis();
+              
+              }
+             
+            }  
+
+
+                          }
+    
+
 
 
 // Send Data Function
 
 String sendData(String command, const int timeout, boolean debug)
 {
+  
     String response = "";
     Serial1.println(command);
     long int time = millis();
