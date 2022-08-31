@@ -1,0 +1,14 @@
+var status_code=msg.payload.status_code;
+
+if (status_code==13300){msg.payload="MAJOR BREACH: Box lid OPEN";}
+if (status_code==13210){ msg.payload="MAJOR BREACH: LEFT fence";}
+if (status_code==13201){ msg.payload="MAJOR BREACH: RIGHT fence";}
+if (status_code==13211){ msg.payload="MAJOR BREACH: LEFT and RIGHT fence";}
+
+if (status_code==11210){ msg.payload="MINOR BREACH: LEFT fence";}
+if (status_code==11201){ msg.payload="MINOR BREACH: RIGHT fence";}
+if (status_code==11211){ msg.payload="MINOR BREACH: LEFT and RIGHT fence";}
+
+msg.topic="Fence_Demo_Alert"
+
+return msg

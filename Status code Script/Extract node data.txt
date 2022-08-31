@@ -1,0 +1,16 @@
+var status_code = parseFloat(msg.payload.objectJSON.analogInput["1"]);       //Undo indexing to get status code
+status_code+=327.68;
+status_code*=100;
+status_code=Math.round(status_code);
+    
+        //Extract other infomation from device 
+        
+const node_data =[{ "node_id":msg.payload.deviceName,
+                    //gateway_location:{latitude:msg.payload.rxInfo[0].location.latitude,
+                      //          longitude:msg.payload.rxInfo[0].location.longitude},
+                    "rssi":msg.payload.rxInfo[0].rssi,
+                    "status_code":status_code,
+                    "frame_count":msg.payload.fCnt
+}];
+msg.payload=node_data;
+return msg;

@@ -1,0 +1,1 @@
+devices/Fence_demo_node_001/messages/events/$.ct=application%2Fjson&$.ce=utf-8
