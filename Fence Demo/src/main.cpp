@@ -6,46 +6,26 @@
 #include<string>  
 using namespace std;
 
-
        // Device Info
 
-#define DEVEUI "D896E0FF00000466"
+#define DEVEUI "D896E0FF00000468"                                //set 
 #define APPEUI "70B3D57ED0041DA0"
-#define APPKEY "DAC6118A3245672B02EFB73443AF5EB1"
-
+#define APPKEY "15993DDDAFFA0D7D32D515A419743EE6"                                
+  
     //DEBUG
 #define DEBUG true
 #define DECODE_NEC 
 
-
         //Constants
-
-int IrPin=8;    //Ir input pin
 
 int SideSwitchPin_Right=7;
 int SideSwitchPin_Left=6;
 
-int validation=0;
-int input;             // the current reading from the input pin
-int previous_command;   //meaningless 
-int command ;   // the previous reading from the input pin
-
-
-String symbol="";
-String status="";
-String msg="";
-
-unsigned long lastDebounceTime = 0;  // the last time the input changed
-unsigned long debounceDelay = 200;    // the debounce time; increase if outputting multiple times
-
-long int runtime = 20000;
 const long All_clear_interval= 30*(1000);   // in seconds
 const long Alert_interval = 5*(1000);                // seconds
-
 const int Breach_duration=3*(1000);     //in seconds
 
 
-int counter = 0;
 unsigned long startMillis;
 unsigned long startMillis_Right;
 unsigned long startMillis_Left;
@@ -55,7 +35,6 @@ unsigned long previousMillis;
 unsigned long previousMillis2;
 unsigned long left_Millis;
 unsigned long right_Millis;
-
 
 int SideSwitchVal_Right;
 int SideSwitchVal_Left;
@@ -79,22 +58,24 @@ CayenneLPP lpp(51);  //payloadd size
 String sendData(String command, const int timeout, boolean debug);
 void SendPayload(int msg);
 void UpdateState(String Side);
-
+void join_and_reconnect();
 
                 //test code
 
 int CentreSwitchVal_Right=LOW;
 int CentreSwitchVal_Left=LOW;
 
-
 void setup() {
 
-
     Serial1.begin(115200);
+    if (DEBUG){
+
     SerialUSB.begin(115200);
     while (!Serial1) {; }
     while (!SerialUSB) {; }
-    SerialUSB.println("System setup");    
+
+    }
+    SerialUSB.println("System Setup");    
                          //Setup up connection
 
                  //DEV INFO
@@ -110,13 +91,12 @@ void setup() {
     pinMode (SideSwitchPin_Right,INPUT_PULLDOWN);
     pinMode (SideSwitchPin_Left,INPUT_PULLDOWN);
 
-    SerialUSB.println("Online");
+    SerialUSB.println("System Online");
 
   }
 
 void loop() {
   
-
        // Reading sensor output
 
   SideSwitchVal_Right =!digitalRead(SideSwitchPin_Right);
@@ -144,7 +124,6 @@ if (SideSwitchVal_Left==0 || CentreSwitchVal_Left==1)              //Left side A
      LeftAlarm_currentState=LOW;
     }
 
-
                  //overall Alarm State
 if (RightAlarm_currentState !=RightAlarm_lastState)
 {                                       
@@ -156,7 +135,6 @@ if (LeftAlarm_currentState !=LeftAlarm_lastState){
   UpdateState("Left");}
   
   LeftAlarm_lastState = LeftAlarm_currentState;
-
 
 
          //Alarm Logic      
@@ -183,8 +161,7 @@ if (BoxAlarm_currentState == HIGH
       UpdateState("Alert");
       }
 
-
- ////////////////////////////////////////////////////// //sending Alert lora payload
+                       //sending Alert lora payload
 if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) ) 
 
 { 
@@ -196,15 +173,10 @@ if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )
         if(RightAlarm_currentState==HIGH){
           current_val+=2;
         }
-
         if(BoxAlarm_currentState==HIGH){
           current_val+=5;
         }
-
         Status_code+=current_val;
-        SerialUSB.println("Status_code:");
-        SerialUSB.println(Status_code);
-
         SendPayload(Status_code);
 
         current_val=0;
@@ -251,6 +223,7 @@ String sendData(String command, const int timeout, boolean debug)
 {
   
     String response = "";
+    if (DEBUG){SerialUSB.println("Status_code:");}
     Serial1.println(command);
     long int time = millis();
     while ((time + timeout) > millis())
@@ -288,3 +261,4 @@ void SendPayload(int msg){
     
 
 }
+void join_and_reconnect();
