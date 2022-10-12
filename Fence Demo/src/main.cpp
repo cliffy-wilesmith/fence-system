@@ -41,6 +41,7 @@ int Status_code;
 int Trigger;
 int Connection_status;
 String Connection_check;
+String Send_check;
 
 CayenneLPP lpp(51);  //payloadd size
 
@@ -49,7 +50,7 @@ CayenneLPP lpp(51);  //payloadd size
 String sendData(String command, const int timeout, boolean debug);
 void SendPayload(int msg);
 void UpdateState(String Side);
-void join_and_reconnect();
+void Reconnect();
 
                 //test code!!!!!!!!!!!!!!!!!!!
 
@@ -79,7 +80,7 @@ void setup() {
     sendData("AT+CAPPKEY=" + String(APPKEY), 200, false);   //set APPKEY
 
     SerialUSB.println("Connecting to Gateway......");
-    Connection_check = sendData("AT+CJOIN=1,0,10,1", 12000, false);           //join lorawan             10seconds,1 attempt
+    Connection_check = sendData("AT+CJOIN=1,0,10,2", 30000, false);           // join lorawan         every 10 seconds,3 total attempts
 
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Connection to Gateway Successful");
@@ -89,13 +90,7 @@ void setup() {
         SerialUSB.println("Connection to Gateway Failed");
         Connection_status=0;}
 
-
-
-    SerialUSB.println("Monitoring System Active");
-
-    // sendData("AT+CJOIN?", 10000, true);
-
-
+    SerialUSB.println("Monitoring System Active");               //start fence monitoring regardless of connection status
   }
 
 void loop() {
@@ -182,7 +177,9 @@ if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )
 if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_currentState == LOW &&  Alert_sent == HIGH)
 {
   UpdateState("Alert");
-  SerialUSB.println("Sending all clear signal");
+  SerialUSB.println("Sending all clear signal....");
+  SendPayload(13500);
+                 
   }
 
 }
@@ -215,7 +212,6 @@ void UpdateState(String Side){
 
 String sendData(String command, const int timeout, boolean debug)
 { 
-
     String response=""; 
     Serial1.println(command);
     long int time = millis();
@@ -240,6 +236,12 @@ void SendPayload(int msg){
         SerialUSB.print("Status_code: ");
         SerialUSB.println(msg);
 
+
+    if (Connection_status==0){                                                           //check if connected to gateway
+      SerialUSB.println("Device NOT Connected to Gateway, Reconnecting....... ");
+      Reconnect();                                                                           //try to reconnect
+      }
+
     }
     lpp.reset();
     lpp.addLuminosity(1,msg);
@@ -252,10 +254,31 @@ void SendPayload(int msg){
     char HEXpayload[51] = "";
 
     sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
-
     SerialUSB.println("Sending........");    
-    sendData((String)HEXpayload, 3000, DEBUG);
     
+    Send_check = sendData((String)HEXpayload, 1500, DEBUG);           
+
+    if(Send_check.indexOf("OK+SEND:04") > 0){                          // check if connected to Gateway     //FIX using RECV
+        SerialUSB.println("SEND OK");
+        Connection_status=1;
+
+    }else{
+        SerialUSB.println("SEND FAILED, Attempting to send Again");
+        Connection_status=0;
+        SendPayload(msg);
+        }
 
 }
-void join_and_reconnect();
+
+void Reconnect(){
+
+      Connection_check = sendData("AT+CJOIN=1,0,10,1", 12000, false);          //try to reconnect      every 10seconds,1 attempt
+
+    if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+        SerialUSB.println("Reconnection to Gateway Successful");
+        Connection_status=1;
+
+    }else{
+        SerialUSB.println("Reconnection to Gateway Failed");
+        Connection_status=0;}
+};
