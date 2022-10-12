@@ -1,46 +1,36 @@
 #include <Arduino.h>
-#include <PinDefinitionsAndMore.h>       //Define macros for input and output pin etc.
-#include <IRremote.hpp>
 #include <CayenneLPP.h>
 #include <iostream>
-#include<string>  
-using namespace std;
 
-       // Device Info
+
+        // Device Info
 
 #define DEVEUI "D896E0FF00000468"                                //set 
 #define APPEUI "70B3D57ED0041DA0"
 #define APPKEY "15993DDDAFFA0D7D32D515A419743EE6"                                
   
-    //DEBUG
+        //DEBUG
 #define DEBUG true
-#define DECODE_NEC 
 
         //Constants
 
 int SideSwitchPin_Right=7;
 int SideSwitchPin_Left=6;
 
-const long All_clear_interval= 30*(1000);   // in seconds
+const long All_clear_interval= 30*(1000);         // in seconds
 const long Alert_interval = 5*(1000);                // seconds
 const int Breach_duration=3*(1000);     //in seconds
 
-
-unsigned long startMillis;
 unsigned long startMillis_Right;
 unsigned long startMillis_Left;
-unsigned long currentMillis;
-unsigned long elapsedMillis;
 unsigned long previousMillis;
-unsigned long previousMillis2;
-unsigned long left_Millis;
-unsigned long right_Millis;
 
 int SideSwitchVal_Right;
 int SideSwitchVal_Left;
 
 int RightAlarm_currentState;
 int RightAlarm_lastState = LOW;
+
 int LeftAlarm_currentState;
 int LeftAlarm_lastState=LOW;
 
@@ -48,19 +38,20 @@ int BoxAlarm_currentState=LOW;
 
 int Alert_sent=LOW;
 int Status_code;
-int trigger;
-int count=0;
+int Trigger;
+int Connection_status;
+String Connection_check;
 
 CayenneLPP lpp(51);  //payloadd size
 
-//Declare Function
+           //Declare Function
 
 String sendData(String command, const int timeout, boolean debug);
 void SendPayload(int msg);
 void UpdateState(String Side);
 void join_and_reconnect();
 
-                //test code
+                //test code!!!!!!!!!!!!!!!!!!!
 
 int CentreSwitchVal_Right=LOW;
 int CentreSwitchVal_Left=LOW;
@@ -69,29 +60,41 @@ void setup() {
 
     Serial1.begin(115200);
     if (DEBUG){
-
     SerialUSB.begin(115200);
     while (!Serial1) {; }
     while (!SerialUSB) {; }
-
     }
-    SerialUSB.println("System Setup");    
-                         //Setup up connection
+    SerialUSB.println("Initialising System..........");    
 
-                 //DEV INFO
-    sendData("AT+CDEVEUI=" + String(DEVEUI), 200, false);     //set DEVEUI
-    sendData("AT+CAPPEUI=" + String(APPEUI), 200, false);    //set APPEUI
-    sendData("AT+CAPPKEY=" + String(APPKEY), 200, false);   //set APPKEY
-
-    SerialUSB.println("Connecting......");
-    sendData("AT+CJOIN=1,0,10,12", 30000, DEBUG);           //join lorawan
-    
-                        // pinMode
+                            // pinMode
 
     pinMode (SideSwitchPin_Right,INPUT_PULLDOWN);
     pinMode (SideSwitchPin_Left,INPUT_PULLDOWN);
 
-    SerialUSB.println("System Online");
+                         //Setup up connection
+
+                 //DEV INFO*
+    sendData("AT+CDEVEUI=" + String(DEVEUI), 200, false);     //set DEVEUI
+    sendData("AT+CAPPEUI=" + String(APPEUI), 200, false);    //set APPEUI
+    sendData("AT+CAPPKEY=" + String(APPKEY), 200, false);   //set APPKEY
+
+    SerialUSB.println("Connecting to Gateway......");
+    Connection_check = sendData("AT+CJOIN=1,0,10,1", 12000, false);           //join lorawan             10seconds,1 attempt
+
+    if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+        SerialUSB.println("Connection to Gateway Successful");
+        Connection_status=1;
+
+    }else{
+        SerialUSB.println("Connection to Gateway Failed");
+        Connection_status=0;}
+
+
+
+    SerialUSB.println("Monitoring System Active");
+
+    // sendData("AT+CJOIN?", 10000, true);
+
 
   }
 
@@ -101,14 +104,6 @@ void loop() {
 
   SideSwitchVal_Right =!digitalRead(SideSwitchPin_Right);
   SideSwitchVal_Left =!digitalRead(SideSwitchPin_Left);
-
-  // if( millis()-previousMillis2 >Alert_interval){
-  //       SerialUSB.println(SideSwitchVal_Right);
-  //       SerialUSB.println(SideSwitchVal_Left);
-
-  //       previousMillis2=millis();
-  //       }
-        
 
 if (SideSwitchVal_Right==0 || CentreSwitchVal_Right==1)             //Right side Alarm state
     {
@@ -143,21 +138,21 @@ if (LeftAlarm_currentState == HIGH                                              
     && Alert_sent == LOW 
     && (millis()-startMillis_Left>Breach_duration ))
     {
-      trigger=13200;
+      Trigger=13200;
       UpdateState("Alert");}
     
 if (RightAlarm_currentState == HIGH 
     && Alert_sent == LOW 
     && (millis()-startMillis_Right>Breach_duration ))
     
-    { trigger=13300;
+    { Trigger=13300;
       UpdateState("Alert");
       }
 
 if (BoxAlarm_currentState == HIGH 
     && Alert_sent == LOW )
     
-    { trigger=13400;
+    { Trigger=13400;
       UpdateState("Alert");
       }
 
@@ -166,7 +161,7 @@ if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )
 
 { 
        int current_val=0;                           // add current fence state info to alert message
-       Status_code=trigger;
+       Status_code=Trigger;
         if(LeftAlarm_currentState==HIGH){
           current_val+=1;
         }
@@ -191,7 +186,6 @@ if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_cu
   }
 
 }
-
 
 void UpdateState(String Side){
  
@@ -220,10 +214,9 @@ void UpdateState(String Side){
 // Send Data Function
 
 String sendData(String command, const int timeout, boolean debug)
-{
-  
-    String response = "";
-    if (DEBUG){SerialUSB.println("Status_code:");}
+{ 
+
+    String response=""; 
     Serial1.println(command);
     long int time = millis();
     while ((time + timeout) > millis())
@@ -234,7 +227,7 @@ String sendData(String command, const int timeout, boolean debug)
             response += c;
         }
     }
-    if (debug)
+    if (debug) 
     {
         SerialUSB.print(response);
     }
@@ -243,7 +236,11 @@ String sendData(String command, const int timeout, boolean debug)
 
 void SendPayload(int msg){
 
-    SerialUSB.println(msg);
+    if (DEBUG) {
+        SerialUSB.print("Status_code: ");
+        SerialUSB.println(msg);
+
+    }
     lpp.reset();
     lpp.addLuminosity(1,msg);
     int size = lpp.getSize();
@@ -257,7 +254,7 @@ void SendPayload(int msg){
     sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
 
     SerialUSB.println("Sending........");    
-    sendData((String)HEXpayload, 4000, DEBUG);
+    sendData((String)HEXpayload, 3000, DEBUG);
     
 
 }
