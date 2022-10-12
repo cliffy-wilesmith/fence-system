@@ -80,7 +80,7 @@ void setup() {
     sendData("AT+CAPPKEY=" + String(APPKEY), 200, false);   //set APPKEY
 
     SerialUSB.println("Connecting to Gateway......");
-    Connection_check = sendData("AT+CJOIN=1,0,10,2", 30000, false);           // join lorawan         every 10 seconds,3 total attempts
+    Connection_check = sendData("AT+CJOIN=1,0,10,1", 10000, false);           // join lorawan         every 10 seconds,3 total attempts
 
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Connection to Gateway Successful");
@@ -256,14 +256,14 @@ void SendPayload(int msg){
     sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
     SerialUSB.println("Sending........");    
     
-    Send_check = sendData((String)HEXpayload, 1500, DEBUG);           
+    Send_check = sendData((String)HEXpayload, 5000, DEBUG);           
 
-    if(Send_check.indexOf("OK+SEND:04") > 0){                          // check if connected to Gateway     //FIX using RECV
-        SerialUSB.println("SEND OK");
+    if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway     //FIX using RECV
+        SerialUSB.println("RECV OK");
         Connection_status=1;
 
     }else{
-        SerialUSB.println("SEND FAILED, Attempting to send Again");
+        SerialUSB.println("RECV FAILED, Attempting to send Again");
         Connection_status=0;
         SendPayload(msg);
         }
@@ -272,7 +272,11 @@ void SendPayload(int msg){
 
 void Reconnect(){
 
-      Connection_check = sendData("AT+CJOIN=1,0,10,1", 12000, false);          //try to reconnect      every 10seconds,1 attempt
+  SerialUSB.println("");
+  SerialUSB.println("Attempting Reconnection");
+  SerialUSB.println("");
+
+    Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt
 
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Reconnection to Gateway Successful");
