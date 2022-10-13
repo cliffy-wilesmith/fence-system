@@ -1,23 +1,32 @@
 #include <Arduino.h>
 #include <CayenneLPP.h>
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
+#include <DHT_U.h>
 #include <iostream>
-
 
         // Device Info
 
 #define DEVEUI "D896E0FF00000468"                                //set 
 #define APPEUI "70B3D57ED0041DA0"
-#define APPKEY "15993DDDAFFA0D7D32D515A419743EE6"                                
-  
+#define APPKEY "15993DDDAFFA0D7D32D515A419743EE6" 
+
+
+#define DHTTYPE DHT11 
+#define DHTPIN 10
+DHT_Unified dht(DHTPIN, DHTTYPE);
+
         //DEBUG
 #define DEBUG true
 
         //Constants
 
+int DHT11_Pin = 4;
 int SideSwitchPin_Right=7;
 int SideSwitchPin_Left=6;
 
-const long All_clear_interval= 30*(1000);         // in seconds
+const long All_clear_interval= 3600*(1000);         // in seconds
+const long All_clear_delay= 10*(1000);            
 const long Alert_interval = 5*(1000);                // seconds
 const int Breach_duration=3*(1000);     //in seconds
 
@@ -51,6 +60,8 @@ String sendData(String command, const int timeout, boolean debug);
 void SendPayload(int msg);
 void UpdateState(String Side);
 void Reconnect();
+void Get_dht_Temp();
+
 
                 //test code!!!!!!!!!!!!!!!!!!!
 
@@ -60,12 +71,14 @@ int CentreSwitchVal_Left=LOW;
 void setup() {
 
     Serial1.begin(115200);
+    dht.begin();
+    
     if (DEBUG){
     SerialUSB.begin(115200);
     while (!Serial1) {; }
     while (!SerialUSB) {; }
     }
-    SerialUSB.println("Initialising System..........");    
+    SerialUSB.println("Initialising System..........\n");    
 
                             // pinMode
 
@@ -80,17 +93,23 @@ void setup() {
     sendData("AT+CAPPKEY=" + String(APPKEY), 200, false);   //set APPKEY
 
     SerialUSB.println("Connecting to Gateway......");
-    Connection_check = sendData("AT+CJOIN=1,0,10,1", 10000, false);           // join lorawan         every 10 seconds,3 total attempts
+    SerialUSB.println();
+    Connection_check = sendData("AT+CJOIN=1,0,10,2", 10000, false);           // join lorawan         every 10 seconds,3 total attempts
+
+
 
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Connection to Gateway Successful");
+        SerialUSB.println();
         Connection_status=1;
 
     }else{
         SerialUSB.println("Connection to Gateway Failed");
+        SerialUSB.println();
         Connection_status=0;}
 
     SerialUSB.println("Monitoring System Active");               //start fence monitoring regardless of connection status
+    SerialUSB.println();
   }
 
 void loop() {
@@ -125,7 +144,6 @@ if (LeftAlarm_currentState !=LeftAlarm_lastState){
   UpdateState("Left");}
   
   LeftAlarm_lastState = LeftAlarm_currentState;
-
 
          //Alarm Logic      
              
@@ -175,11 +193,10 @@ if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )
         }
 
 if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_currentState == LOW &&  Alert_sent == HIGH)
-{
+{ 
   UpdateState("Alert");
-  SerialUSB.println("Sending all clear signal....");
-  SendPayload(13500);
-                 
+  SerialUSB.println("Alert Level Low");
+                   
   }
 
 }
@@ -233,18 +250,30 @@ String sendData(String command, const int timeout, boolean debug)
 void SendPayload(int msg){
 
     if (DEBUG) {
-        SerialUSB.print("Status_code: ");
+      
+        SerialUSB.print("ALERT, Sending Status_code: ");
         SerialUSB.println(msg);
 
 
     if (Connection_status==0){                                                           //check if connected to gateway
-      SerialUSB.println("Device NOT Connected to Gateway, Reconnecting....... ");
+      SerialUSB.println("\n NOT CONNECTED to Gateway \n");
       Reconnect();                                                                           //try to reconnect
+
+       if (Connection_status==0){                     //Checking Reconnect
+        SerialUSB.println("ALERT Can NOT be SENT");
+        return;}
+
+       if (Connection_status==1){
+        SerialUSB.println("Attempting to send msg");
+        }
       }
 
     }
+
     lpp.reset();
     lpp.addLuminosity(1,msg);
+    Get_dht_Temp();
+
     int size = lpp.getSize();
     char payload[size];
 
@@ -253,36 +282,92 @@ void SendPayload(int msg){
     }
     char HEXpayload[51] = "";
 
-    sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
-    SerialUSB.println("Sending........");    
-    
-    Send_check = sendData((String)HEXpayload, 5000, DEBUG);           
+    sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3],payload[4],payload[5],payload[6],payload[7]);     //3 onwards is temp
+
+    SerialUSB.println(HEXpayload);
+      
+  
+    Send_check = sendData((String)HEXpayload, 2000, false);
+    delay(300);   
+
+    if(Send_check.indexOf("OK+SEND") > 0){
+      SerialUSB.println("\nSEND check OK");
+
+    }else{
+        SerialUSB.println("SEND check FAILED");
+        }        
 
     if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway     //FIX using RECV
-        SerialUSB.println("RECV OK");
+        SerialUSB.println("\nRECV check OK");
         Connection_status=1;
 
     }else{
-        SerialUSB.println("RECV FAILED, Attempting to send Again");
+        SerialUSB.println("RECV check FAILED");
         Connection_status=0;
-        SendPayload(msg);
+        // SendPayload(msg);
         }
 
 }
 
 void Reconnect(){
 
-  SerialUSB.println("");
-  SerialUSB.println("Attempting Reconnection");
-  SerialUSB.println("");
+  SerialUSB.println("Attempting Reconnection [1 of 3]..............\n");
+  Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt
 
-    Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt
+  if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+    SerialUSB.println("Reconnection to Gateway Successful");
+    Connection_status=1;
+    return;
 
+  }else{
+    SerialUSB.println("Reconnection to Gateway Failed \n");
+    SerialUSB.println("Attempting Reconnection [2 of 3]..............\n");
+    Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
+      
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
-        SerialUSB.println("Reconnection to Gateway Successful");
-        Connection_status=1;
+      SerialUSB.println("Reconnection to Gateway Successful");
+      Connection_status=1;
+      return;
 
     }else{
+      SerialUSB.println("Reconnection to Gateway Failed \n");
+      
+      SerialUSB.println("Attempting Reconnection [3 of 3]..............\n");
+      Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
+      
+      if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+        SerialUSB.println("Reconnection to Gateway Successful");
+        Connection_status=1;
+        return;
+      }else{
+
         SerialUSB.println("Reconnection to Gateway Failed");
+        SerialUSB.println();
+        SerialUSB.println("Max attempts reached");
         Connection_status=0;}
+    }
+  }
 };
+
+
+void Get_dht_Temp(){
+
+  // Get temperature 
+  sensors_event_t event;
+
+  dht.temperature().getEvent(&event);
+  if (isnan(event.temperature)) {
+    SerialUSB.println("\nError reading temperature, Using place holder");
+    lpp.addTemperature(2,67);
+  }
+  else {
+    SerialUSB.print(F("Temperature: "));
+    lpp.addTemperature(2,event.temperature);
+
+  }
+
+  
+
+
+
+}
