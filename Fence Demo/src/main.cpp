@@ -21,18 +21,24 @@ DHT_Unified dht(DHTPIN, DHTTYPE);
 
         //Constants
 
-int DHT11_Pin = 4;
+int DHT11_Pin = 4;           //careful might be a reset pin                                   //Change Values
 int SideSwitchPin_Right=7;
 int SideSwitchPin_Left=6;
 
-const long All_clear_interval= 3600*(1000);         // in seconds
-const long All_clear_delay= 10*(1000);            
+int CentreSwitchPin_Right=9;
+int CentreSwitchPin_Left=8;
+
+const long Still_alive_interval= 3600*(1000);         // in seconds
+// const long All_clear_delay= 10*(1000);            
 const long Alert_interval = 5*(1000);                // seconds
 const int Breach_duration=3*(1000);     //in seconds
 
 unsigned long startMillis_Right;
 unsigned long startMillis_Left;
 unsigned long previousMillis;
+
+int CentreSwitchVal_Right;
+int CentreSwitchVal_Left;
 
 int SideSwitchVal_Right;
 int SideSwitchVal_Left;
@@ -43,7 +49,7 @@ int RightAlarm_lastState = LOW;
 int LeftAlarm_currentState;
 int LeftAlarm_lastState=LOW;
 
-int BoxAlarm_currentState=LOW;
+int BoxAlarm_currentState=LOW;                       //Change w
 
 int Alert_sent=LOW;
 int Status_code;
@@ -65,15 +71,15 @@ void Get_dht_Temp();
 
                 //test code!!!!!!!!!!!!!!!!!!!
 
-int CentreSwitchVal_Right=LOW;
-int CentreSwitchVal_Left=LOW;
+// int CentreSwitchVal_Right=LOW;
+// int CentreSwitchVal_Left=LOW;
 
 void setup() {
 
     Serial1.begin(115200);
     dht.begin();
     
-    if (DEBUG){
+    if (false){
     SerialUSB.begin(115200);
     while (!Serial1) {; }
     while (!SerialUSB) {; }
@@ -82,8 +88,11 @@ void setup() {
 
                             // pinMode
 
-    pinMode (SideSwitchPin_Right,INPUT_PULLDOWN);
-    pinMode (SideSwitchPin_Left,INPUT_PULLDOWN);
+    pinMode (SideSwitchPin_Right,INPUT);
+    pinMode (SideSwitchPin_Left,INPUT);
+
+    pinMode (CentreSwitchPin_Right,INPUT_PULLDOWN);
+    pinMode (CentreSwitchPin_Left,INPUT_PULLDOWN);
 
                          //Setup up connection
 
@@ -116,8 +125,14 @@ void loop() {
   
        // Reading sensor output
 
-  SideSwitchVal_Right =!digitalRead(SideSwitchPin_Right);
-  SideSwitchVal_Left =!digitalRead(SideSwitchPin_Left);
+  // SideSwitchVal_Right =!digitalRead(SideSwitchPin_Right);           //For test unit
+  // SideSwitchVal_Left =!digitalRead(SideSwitchPin_Left);  
+
+  SideSwitchVal_Right =digitalRead(SideSwitchPin_Right);           
+  SideSwitchVal_Left =digitalRead(SideSwitchPin_Left); 
+
+  CentreSwitchVal_Right =digitalRead(CentreSwitchPin_Right);  
+  CentreSwitchVal_Left =digitalRead(CentreSwitchPin_Left);             
 
 if (SideSwitchVal_Right==0 || CentreSwitchVal_Right==1)             //Right side Alarm state
     {
@@ -138,7 +153,7 @@ if (RightAlarm_currentState !=RightAlarm_lastState)
 {                                       
   UpdateState("Right");} 
   
-  RightAlarm_lastState = RightAlarm_currentState;      //change confusion
+  RightAlarm_lastState = RightAlarm_currentState;     
 
 if (LeftAlarm_currentState !=LeftAlarm_lastState){
   UpdateState("Left");}
@@ -192,12 +207,40 @@ if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )
         previousMillis=millis();
         }
 
-if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_currentState == LOW &&  Alert_sent == HIGH)
+if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_currentState == LOW &&  Alert_sent == HIGH)     //Box
 { 
   UpdateState("Alert");
   SerialUSB.println("Alert Level Low");
                    
   }
+
+if ((millis()-previousMillis)>Still_alive_interval){
+
+  { 
+
+      Trigger=13500;
+      int current_val=0;                           // add current fence state info to alert message
+      Status_code=Trigger;
+        if(LeftAlarm_currentState==HIGH){
+          current_val+=1;
+        }
+        if(RightAlarm_currentState==HIGH){
+          current_val+=2;
+        }
+        if(BoxAlarm_currentState==HIGH){
+          current_val+=5;
+        }
+        Status_code+=current_val;
+        SendPayload(Status_code);
+
+        current_val=0;
+
+        previousMillis=millis();
+        }
+
+}
+
+
 
 }
 
@@ -284,7 +327,7 @@ void SendPayload(int msg){
 
     sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3],payload[4],payload[5],payload[6],payload[7]);     //3 onwards is temp
 
-    SerialUSB.println(HEXpayload);
+    // SerialUSB.println(HEXpayload);
       
   
     Send_check = sendData((String)HEXpayload, 2000, false);
@@ -297,14 +340,42 @@ void SendPayload(int msg){
         SerialUSB.println("SEND check FAILED");
         }        
 
-    if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway     //FIX using RECV
+    if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway   
         SerialUSB.println("\nRECV check OK");
         Connection_status=1;
 
     }else{
         SerialUSB.println("RECV check FAILED");
         Connection_status=0;
-        // SendPayload(msg);
+
+        SerialUSB.println("Attempting Resend [1 of 1]..............\n");
+
+        Reconnect();
+       
+        Send_check = sendData((String)HEXpayload, 2000, false);
+        delay(300);
+        
+
+        if(Send_check.indexOf("OK+SEND") > 0){
+        SerialUSB.println("\nSEND check OK");
+
+        }else{
+        SerialUSB.println("SEND check FAILED AGAIN");
+              }        
+
+        if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway   
+        SerialUSB.println("\nRECV check OK, RESEND OK");
+        Connection_status=1;
+
+          }else{
+
+            SerialUSB.println("\nRESEND FAILED Max attempts reached ");
+            
+            }
+          
+
+
+      
         }
 
 }
@@ -313,6 +384,7 @@ void Reconnect(){
 
   SerialUSB.println("Attempting Reconnection [1 of 3]..............\n");
   Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt
+  delay(300); 
 
   if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
     SerialUSB.println("Reconnection to Gateway Successful");
@@ -323,6 +395,7 @@ void Reconnect(){
     SerialUSB.println("Reconnection to Gateway Failed \n");
     SerialUSB.println("Attempting Reconnection [2 of 3]..............\n");
     Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
+    delay(300); 
       
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
       SerialUSB.println("Reconnection to Gateway Successful");
@@ -334,6 +407,7 @@ void Reconnect(){
       
       SerialUSB.println("Attempting Reconnection [3 of 3]..............\n");
       Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
+      delay(300); 
       
       if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Reconnection to Gateway Successful");
@@ -365,9 +439,4 @@ void Get_dht_Temp(){
     lpp.addTemperature(2,event.temperature);
 
   }
-
-  
-
-
-
 }
