@@ -219,7 +219,7 @@ if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )
           current_val+=5;
         }
         Status_code+=current_val;
-        SendPayload(Status_code);
+        // SendPayload(Status_code);
 
         current_val=0;
 
