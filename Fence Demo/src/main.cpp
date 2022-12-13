@@ -90,21 +90,21 @@ void setup() {
     sendData("AT+CAPPEUI=" + String(APPEUI), 200, false);    //set APPEUI
     sendData("AT+CAPPKEY=" + String(APPKEY), 200, false);   //set APPKEY
 
-    // SerialUSB.println("Connecting to Gateway......");
+    SerialUSB.println("Connecting to Gateway......");
     SerialUSB.println();
-    // Connection_check = sendData("AT+CJOIN=1,0,10,1", 10000, false);           // join lorawan         every 10 seconds,2 total attempts
+    Connection_check = sendData("AT+CJOIN=1,0,10,1", 10000, false);           // join lorawan         every 10 seconds,2 total attempts
 
 
-    // delay(300);
-    // if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
-    //     SerialUSB.println("Connection to Gateway Successful");
-    //     SerialUSB.println();
-    //     Connection_status=1;
+    delay(300);
+    if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+        SerialUSB.println("Connection to Gateway Successful");
+        SerialUSB.println();
+        Connection_status=1;
 
-    // }else{
-    //     SerialUSB.println("Connection to Gateway Failed");
-    //     SerialUSB.println();
-    //     Connection_status=0;}
+    }else{
+        SerialUSB.println("Connection to Gateway Failed");
+        SerialUSB.println();
+        Connection_status=0;}
 
     SerialUSB.println("Monitoring System Active");               //start fence monitoring regardless of connection status
     SerialUSB.println();
@@ -132,23 +132,23 @@ void loop() {
   // SerialUSB.println("\n Centre RIGHT");
   // SerialUSB.println(digitalRead(CentreSwitchPin_Right));           
 
-if (SideSwitchVal_Right==0 && CentreSwitchVal_Right==1)             //Right side Alarm state
+if (SideSwitchVal_Right==1 && CentreSwitchVal_Right==0)             //Right side Alarm state
     {
     RightAlarm_currentState=LOW; 
 
     if((millis()-previousMillis3)>Display_interval){
-    SerialUSB.println("RIGHT FINE"); 
+    // SerialUSB.println("RIGHT FINE"); 
     previousMillis3=millis();}
        
     }else{
     RightAlarm_currentState= HIGH; 
 
     if((millis()-previousMillis3)>Display_interval){
-    SerialUSB.println("RIGHT ALERT!!!!!!!!!!!!!!!!"); 
+    // SerialUSB.println("RIGHT ALERT!!!!!!!!!!!!!!!!"); 
     previousMillis3=millis();}  
     }
  
-if (SideSwitchVal_Left==0 && CentreSwitchVal_Left==1)              //Left side Alarm state
+if (SideSwitchVal_Left==1 && CentreSwitchVal_Left==0)              //Left side Alarm state
     {
       if((millis()-previousMillis2)>Display_interval){
       SerialUSB.println("LEFT FINE");
@@ -164,7 +164,6 @@ if (SideSwitchVal_Left==0 && CentreSwitchVal_Left==1)              //Left side A
     previousMillis2=millis(); }   
      
     }
-
 
 
                  //overall Alarm State

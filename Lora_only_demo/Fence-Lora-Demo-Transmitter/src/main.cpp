@@ -10,13 +10,12 @@
 #define RFM95_CS 10
 #define RFM95_RST 9
 #define RFM95_INT 2
-
 #define RF95_FREQ 868.0
 
-CayenneLPP lpp(51);  //payloadd size5
+// CayenneLPP lpp(51);  //payloadd size5s
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
-int16_t packetnum = 100;  // packet counter, we increment per xmission
+// int16_t packetnum = 100;  // packet counter, we increment per xmission
 
 const int LoRaID=66;                                 //set  range:16-255 
 
@@ -26,15 +25,16 @@ int SideSwitchPin_Left=7;
 int CentreSwitchPin_Right=4;
 int CentreSwitchPin_Left=8;
 
-
-const long Still_alive_interval= 120*(1000);         // in seconds
+const long Still_alive_interval= (60000);         // in seconds
 // const long All_clear_delay= 10*(1000);            
-const long Alert_interval = 1*(70);                // seconds
-const int Breach_duration=3*(10);     //in seconds
+const long Alert_interval = 1*(1000);                // seconds
+const int Breach_duration=5*(1000);     //in seconds
+const int Update_interval=3*(70);     //in seconds
 
 unsigned long startMillis_Right;
 unsigned long startMillis_Left;
 unsigned long previousMillis;
+unsigned long previousMillis_Update;
 
 int CentreSwitchVal_Right;
 int CentreSwitchVal_Left;
@@ -54,13 +54,9 @@ int Alert_sent=LOW;
 int Status_code;
 int Trigger;
 int Connection_status;
-String Connection_check;
-String Send_check;
-
 
 void Send_LoraPayload(int msg);
 void UpdateState(String Side);
-
 
 void setup() 
 
@@ -69,12 +65,6 @@ void setup()
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
   Serial.begin(9600);
-
-// if (false){
-//   Serial.begin(115200);
-//   delay(100);
-//   while (!Serial) {; }
-// }
  
   // manual reset
   digitalWrite(RFM95_RST, LOW);
@@ -83,10 +73,10 @@ void setup()
   delay(10);
 
   while (!rf95.init()) {
-    Serial.println("LoRa radio init failed");
+    Serial.println("LoRa radio Initialisation failed");
     while (1);
   }
-  Serial.println("LoRa radio init OK!");
+  Serial.println("LoRa radio Initialisation  OK!");
 
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
   if (!rf95.setFrequency(RF95_FREQ)) {
@@ -95,8 +85,6 @@ void setup()
   }
   Serial.print("Set Freq to: "); Serial.println(RF95_FREQ);
   rf95.setTxPower(23, false);
-
-
                             // pinMode
 
     pinMode (SideSwitchPin_Right,INPUT_PULLUP);
@@ -105,16 +93,13 @@ void setup()
     pinMode (CentreSwitchPin_Right,INPUT_PULLUP);
     pinMode (CentreSwitchPin_Left,INPUT_PULLUP);
    
-
                          //Setup up connection
 
-    // Send_LoraPayload(13500);         //setup connection
+    Send_LoraPayload(13500);         //setup connection
 
     Serial.println("Monitoring System Active");               //start fence monitoring regardless of connection status
     Serial.println();
 }
-
-
 
 void loop()
 {
@@ -123,24 +108,24 @@ void loop()
   SideSwitchVal_Right =digitalRead(SideSwitchPin_Right);           
   SideSwitchVal_Left =digitalRead(SideSwitchPin_Left); 
 
-  SideSwitchVal_Left=1;   //no left side code
+  // SideSwitchVal_Left=1;   //no left side code
 
   CentreSwitchVal_Right =digitalRead(CentreSwitchPin_Right);  
   CentreSwitchVal_Left =digitalRead(CentreSwitchPin_Left);  
 
-  CentreSwitchVal_Left=0;    //no left side code
+  // CentreSwitchVal_Left=0;    //no left side code
 
-
-  if (SideSwitchVal_Right==1 && CentreSwitchVal_Right==0)             //Right side Alarm state
+  if (SideSwitchVal_Right==0 && CentreSwitchVal_Right==1)             //Right side Alarm state
     {
     RightAlarm_currentState=LOW; 
     // SerialUSB.println("RIGHT FINE");   
     }else{
     RightAlarm_currentState= HIGH; 
-    // SerialUSB.println("RIGHT ALERT");   
+    // SerialUSB.println("RIGHT ALERT"); 
+     
     }
  
-if (SideSwitchVal_Left==1 && CentreSwitchVal_Left==0)              //Left side Alarm state
+if (SideSwitchVal_Left==0 && CentreSwitchVal_Left==1)              //Left side Alarm state
     {
     
     LeftAlarm_currentState=LOW;
@@ -166,14 +151,14 @@ if (LeftAlarm_currentState == HIGH                                              
     && Alert_sent == LOW 
     && (millis()-startMillis_Left>Breach_duration ))
     {
-      Trigger=13200;
+      Trigger=16200;
       UpdateState("Alert");}
     
 if (RightAlarm_currentState == HIGH 
     && Alert_sent == LOW 
     && (millis()-startMillis_Right>Breach_duration ))
     
-    { Trigger=13300;
+    { Trigger=16300;
       UpdateState("Alert");
       }
 
@@ -189,7 +174,7 @@ if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )
 
 { 
        int current_val=0;                           // add current fence state info to alert message
-       Status_code=Trigger;
+       Status_code=16000;
         if(LeftAlarm_currentState==HIGH){
           current_val+=1;
         }
@@ -210,8 +195,8 @@ if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )
 if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_currentState == LOW &&  Alert_sent == HIGH)     //Box
 { 
   UpdateState("Alert");
-  Serial.println("Alert Level Low");
-  Send_LoraPayload(13500);
+  Serial.println("ALERT LEVEL LOW");
+  // Send_LoraPayload(13500);
                    
   }
 
@@ -242,7 +227,6 @@ if ((millis()-previousMillis)>Still_alive_interval){
 }
 }
 
-
 void UpdateState(String Side){
  
   if (Side=="Right"){
@@ -264,59 +248,47 @@ void UpdateState(String Side){
               previousMillis=millis();
               
               }
-            }  
-                          }
+            }
 
+  if (((millis()-previousMillis_Update)>Update_interval) )     //Send update
+
+    {
+      Trigger=13500;
+      int current_val=0;                           // add current fence state info to alert message
+      Status_code=Trigger;
+      if(LeftAlarm_currentState==HIGH){
+          current_val+=1;
+        }
+        if(RightAlarm_currentState==HIGH){
+          current_val+=2;
+        }
+        if(BoxAlarm_currentState==HIGH){
+          current_val+=5;
+        }
+        Status_code+=current_val;
+        Send_LoraPayload(Status_code);
+
+        current_val=0;
+        previousMillis_Update=millis();
+        }  
+                          }
 
 void Send_LoraPayload(int msg){
 
-  //  String msg = (String(LoRaID, DEC) + String(StatusCode, DEC) + String(packetnum++, DEC);   //Create CommandCode
-
-
     if (DEBUG) {
       
-        Serial.print("ALERT, Sending Status_code: ");
+        Serial.print("Sending Status_code: ");
         Serial.println(msg);
       }
 
-    char HEXpayload[51] = "";
-  sprintf(HEXpayload,"%i%i%i",msg,LoRaID,packetnum++);
-  
-    
-  Serial.println(HEXpayload);
-         
+  char HEXpayload[51] = "";
+  sprintf(HEXpayload,"%i%i",msg,LoRaID);
+
+  Serial.println(HEXpayload);    
   Serial.println("Sending..."); delay(10);
   rf95.send((uint8_t *)HEXpayload, 10);
 
   Serial.println("Waiting for packet to complete..."); delay(10);
   rf95.waitPacketSent();
-  // Now wait for a reply
-  // uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-  // uint8_t len = sizeof(buf);
-
-  // Serial.println("Waiting for reply..."); delay(10);
-  // if (rf95.waitAvailableTimeout(1000))
-  // { 
-  //   // Should be a reply message for us now   
-  //   if (rf95.recv(buf, &len))
-  //  {
-  //     Serial.print("Got reply: ");
-  //     Serial.println((char*)buf);
-  //     Serial.print("RSSI: ");
-  //     Serial.println(rf95.lastRssi(), DEC);    
-  //   }
-  //   else
-  //   {
-  //     Serial.println("Receive failed");
-  //   }
-  // }
-  // else
-  // {
-  //   Serial.println("No reply, is there a listener around?");
-  // }
-  delay(1000);
-          
-
-
-      
+  Serial.println("Packet Sent");
         }
