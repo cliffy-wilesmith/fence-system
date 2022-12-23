@@ -17,11 +17,11 @@
         //Constants
 
 // int DHT11_Pin = 4;           //careful might be a reset pin                                   //Change Values
-int SideSwitchPin_Right=6;
-int SideSwitchPin_Left=7;
+int SideSwitchPin_Right=9;
+int SideSwitchPin_Left=8;
 
-int CentreSwitchPin_Right=8;
-int CentreSwitchPin_Left=9;
+int CentreSwitchPin_Right=7;
+int CentreSwitchPin_Left=6;
 
 const long Still_alive_interval= 3600*(1000);         // in seconds
 // const long All_clear_delay= 10*(1000);            
@@ -95,7 +95,7 @@ void setup() {
     Connection_check = sendData("AT+CJOIN=1,0,10,1", 10000, false);           // join lorawan         every 10 seconds,2 total attempts
 
 
-    delay(300);
+    delay(400);
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Connection to Gateway Successful");
         SerialUSB.println();
@@ -114,44 +114,31 @@ void loop() {
   
        // Reading sensor output
 
- 
-
   SideSwitchVal_Right =digitalRead(SideSwitchPin_Right);           
   SideSwitchVal_Left =digitalRead(SideSwitchPin_Left); 
-  // SideSwitchVal_Left=0;
-
+ 
   CentreSwitchVal_Right =digitalRead(CentreSwitchPin_Right);  
-  CentreSwitchVal_Left =digitalRead(CentreSwitchPin_Left);  
-  // CentreSwitchVal_Left=1; 
-
-  //  SerialUSB.println("\nRIGHT");
-  // SerialUSB.println(digitalRead(SideSwitchPin_Right));
-  // // SerialUSB.println("\n LEFT");
-  // // SerialUSB.println(digitalRead(SideSwitchPin_Left)); 
-
-  // SerialUSB.println("\n Centre RIGHT");
-  // SerialUSB.println(digitalRead(CentreSwitchPin_Right));           
+  CentreSwitchVal_Left =digitalRead(CentreSwitchPin_Left);          
 
 if (SideSwitchVal_Right==1 && CentreSwitchVal_Right==0)             //Right side Alarm state
     {
     RightAlarm_currentState=LOW; 
 
     if((millis()-previousMillis3)>Display_interval){
-    // SerialUSB.println("RIGHT FINE"); 
+    
     previousMillis3=millis();}
        
     }else{
     RightAlarm_currentState= HIGH; 
 
-    if((millis()-previousMillis3)>Display_interval){
-    // SerialUSB.println("RIGHT ALERT!!!!!!!!!!!!!!!!"); 
+    if((millis()-previousMillis3)>Display_interval){ 
     previousMillis3=millis();}  
     }
  
 if (SideSwitchVal_Left==1 && CentreSwitchVal_Left==0)              //Left side Alarm state
     {
       if((millis()-previousMillis2)>Display_interval){
-      SerialUSB.println("LEFT FINE");
+      
       previousMillis2=millis(); }
     
     LeftAlarm_currentState=LOW;
@@ -160,11 +147,10 @@ if (SideSwitchVal_Left==1 && CentreSwitchVal_Left==0)              //Left side A
     
 
     if((millis()-previousMillis2)>Display_interval){
-    SerialUSB.println("LEFT ALERT----------");
+    
     previousMillis2=millis(); }   
-     
-    }
 
+    }
 
                  //overall Alarm State
 if (RightAlarm_currentState !=RightAlarm_lastState)
@@ -249,7 +235,7 @@ if ((millis()-previousMillis)>Still_alive_interval){
           current_val+=5;
         }
         Status_code+=current_val;
-        // SendPayload(Status_code);
+        SendPayload(Status_code);
 
         current_val=0;
 
@@ -257,8 +243,6 @@ if ((millis()-previousMillis)>Still_alive_interval){
         }
 
 }
-
-
 
 }
 
@@ -344,12 +328,12 @@ void SendPayload(int msg){
     char HEXpayload[51] = "";
 
     sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);     //3 onwards is temp
-    // sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3],payload[4],payload[5],payload[6],payload[7]);
+    
     SerialUSB.println(HEXpayload);
       
   
     Send_check = sendData((String)HEXpayload, 2000, false);
-    delay(300);   
+    delay(500);   
 
     if(Send_check.indexOf("OK+SEND") > 0){
       SerialUSB.println("\nSEND check OK");
@@ -371,7 +355,7 @@ void SendPayload(int msg){
         Reconnect();
        
         Send_check = sendData((String)HEXpayload, 2000, false);
-        delay(300);
+        delay(500);
         
 
         if(Send_check.indexOf("OK+SEND") > 0){
@@ -387,13 +371,8 @@ void SendPayload(int msg){
 
           }else{
 
-            SerialUSB.println("\nRESEND FAILED Max attempts reached ");
-            
+            SerialUSB.println("\nRESEND FAILED Max attempts reached ");   
             }
-          
-
-
-      
         }
 
 }
@@ -402,7 +381,7 @@ void Reconnect(){
 
   SerialUSB.println("Attempting Reconnection [1 of 3]..............\n");
   Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt
-  delay(300); 
+  delay(500); 
 
   if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
     SerialUSB.println("Reconnection to Gateway Successful");
@@ -413,7 +392,7 @@ void Reconnect(){
     SerialUSB.println("Reconnection to Gateway Failed \n");
     SerialUSB.println("Attempting Reconnection [2 of 3]..............\n");
     Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-    delay(300); 
+    delay(500); 
       
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
       SerialUSB.println("Reconnection to Gateway Successful");
@@ -425,7 +404,7 @@ void Reconnect(){
       
       SerialUSB.println("Attempting Reconnection [3 of 3]..............\n");
       Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-      delay(300); 
+      delay(500); 
       
       if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Reconnection to Gateway Successful");
@@ -440,5 +419,3 @@ void Reconnect(){
     }
   }
 };
-
-

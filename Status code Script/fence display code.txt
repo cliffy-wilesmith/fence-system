@@ -132,7 +132,7 @@ void loop() {
   // SerialUSB.println("\n Centre RIGHT");
   // SerialUSB.println(digitalRead(CentreSwitchPin_Right));           
 
-if (SideSwitchVal_Right==0 && CentreSwitchVal_Right==1)             //Right side Alarm state
+if (SideSwitchVal_Right==1 && CentreSwitchVal_Right==0)             //Right side Alarm state
     {
     RightAlarm_currentState=LOW; 
 
@@ -148,7 +148,7 @@ if (SideSwitchVal_Right==0 && CentreSwitchVal_Right==1)             //Right side
     previousMillis3=millis();}  
     }
  
-if (SideSwitchVal_Left==0 && CentreSwitchVal_Left==1)              //Left side Alarm state
+if (SideSwitchVal_Left==1 && CentreSwitchVal_Left==0)              //Left side Alarm state
     {
       if((millis()-previousMillis2)>Display_interval){
       SerialUSB.println("LEFT FINE");
