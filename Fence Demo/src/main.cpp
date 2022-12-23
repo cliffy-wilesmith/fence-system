@@ -8,8 +8,6 @@
 
 #define DEBUG true
 
-
-
         // Device Info
 
 #define DEVEUI "D896E0FF00000468"                                //set 
@@ -81,7 +79,7 @@ void setup() {
     SerialUSB.begin(115200);
     while (!Serial1) {;
     Serial.println("LoRa Module Initialisation failed"); }
-    while (!SerialUSB) {; }
+    // while (!SerialUSB) {; }
     }
 
     SerialUSB.println("Initialising System..........\n");    
@@ -214,8 +212,6 @@ if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_cu
   SerialUSB.println("Alert Level LOW");
                    
   }
-
-
               //Send Still alive Payload
 
 if ((millis()-previousMillis)>Still_alive_interval){
@@ -243,32 +239,34 @@ if ((millis()-previousMillis)>Still_alive_interval){
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                                                           //Declared Functions
 
+          
+          //Update State Function
 void UpdateState(String Side){
  
-  if (Side=="Right"){
+  if (Side=="Right"){                                //check right side alarm state 
     if (RightAlarm_currentState==HIGH)
-            {startMillis_Right=millis();
-            }  //check right side alarm state 
+       {startMillis_Right=millis();
+      }  
   }
    
-  if (Side=="Left"){
+  if (Side=="Left"){                                //check left side alarm state
     if (LeftAlarm_currentState==HIGH)
-            {startMillis_Left=millis();
-            }  //check left side alarm state
+      {startMillis_Left=millis();
+   }  
  }
 
-  if (Side=="Alert")  //check right side alarm state
-            {Alert_sent=!Alert_sent;
-            if(Alert_sent==LOW)
-            {
-              previousMillis=millis();
-              
-              }
-            }  
-                          }
+  if (Side=="Alert"){                                //check right side alarm state
+    Alert_sent=!Alert_sent;
+    if(Alert_sent==LOW)
+      {previousMillis=millis();       
+      }
+    }
+}
 
-// Send Data Function
+
+         // Send Data Function
 
 String sendData(String command, const int timeout, boolean debug)
 { 
@@ -290,10 +288,12 @@ String sendData(String command, const int timeout, boolean debug)
     return response;
 }
 
+
+            // Send Payload Function
+
 void SendPayload(int msg){
 
     if (DEBUG) {
-      
         SerialUSB.print("ALERT, Sending Status_code: ");
         SerialUSB.println(msg);
 
@@ -310,13 +310,11 @@ void SendPayload(int msg){
         SerialUSB.println("Attempting to send msg");
         }
       }
-
     }
 
-    lpp.reset();
+    lpp.reset();                                           //Build Payload
     lpp.addLuminosity(1,msg);
     
-
     int size = lpp.getSize();
     char payload[size];
 
@@ -325,11 +323,8 @@ void SendPayload(int msg){
     }
     char HEXpayload[51] = "";
 
-    sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);     //3 onwards is temp
+    sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);  
     
-    SerialUSB.println(HEXpayload);
-      
-  
     Send_check = sendData((String)HEXpayload, 2000, false);
     delay(500);   
 
