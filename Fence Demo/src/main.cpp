@@ -1,7 +1,14 @@
+        //Included Libraries 
+
 #include <Arduino.h>
 #include <CayenneLPP.h>
-
 #include <iostream>
+
+        //DEBUG STATE
+
+#define DEBUG true
+
+
 
         // Device Info
 
@@ -9,73 +16,77 @@
 #define APPEUI "70B3D57ED0041DA0"
 #define APPKEY "15993DDDAFFA0D7D32D515A419743EE6" 
 
+        //Input Pins
 
-
-        //DEBUG
-#define DEBUG true
-
-        //Constants
-
-// int DHT11_Pin = 4;           //careful might be a reset pin                                   //Change Values
 int SideSwitchPin_Right=9;
 int SideSwitchPin_Left=8;
 
 int CentreSwitchPin_Right=7;
 int CentreSwitchPin_Left=6;
 
-const long Still_alive_interval= 3600*(1000);         // in seconds
-// const long All_clear_delay= 10*(1000);            
-const long Alert_interval = 2*(1000);                // seconds
-const long Display_interval = 1*(1000);                // seconds
-const int Breach_duration=3*(1000);     //in seconds
+      //Time Constants
+
+const long Still_alive_interval= 3600*(1000);    // in seconds *(milliseconds)       
+const long Alert_interval = 2*(1000);           // in seconds *(milliseconds)
+const long Display_interval = 1*(1000);        // in seconds *(milliseconds)
+const int Breach_duration=3*(1000);           // in seconds *(milliseconds)
+
+      //Time Variables
 
 unsigned long startMillis_Right;
 unsigned long startMillis_Left;
 unsigned long previousMillis;
-unsigned long previousMillis2;
-unsigned long previousMillis3;
+
+      //State Variables
+
 int CentreSwitchVal_Right;
 int CentreSwitchVal_Left;
-
 int SideSwitchVal_Right;
 int SideSwitchVal_Left;
 
 int RightAlarm_currentState;
-int RightAlarm_lastState = LOW;
-
 int LeftAlarm_currentState;
+
+int RightAlarm_lastState = LOW;
 int LeftAlarm_lastState=LOW;
-
-int BoxAlarm_currentState=LOW;                       //Change w
-
+int BoxAlarm_currentState=LOW;                       
 int Alert_sent=LOW;
-int Status_code;
-int Trigger;
+
+    //Connection Variables
+
 int Connection_status;
 String Connection_check;
 String Send_check;
 
-CayenneLPP lpp(51);  //payloadd size
+    //Payload Variables
 
-           //Declare Function
+CayenneLPP lpp(51);  //payloadd size
+int Status_code;
+int Trigger;
+
+      //Declare Custom Functions
 
 String sendData(String command, const int timeout, boolean debug);
 void SendPayload(int msg);
 void UpdateState(String Side);
 void Reconnect();
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void setup() {
 
-    Serial1.begin(115200);
-    
-    if (true){
+    Serial1.begin(115200);           //Start up LORAWAN module
+
+    if (true){                                                    //DEBUG CODE
     SerialUSB.begin(115200);
-    while (!Serial1) {; }
+    while (!Serial1) {;
+    Serial.println("LoRa Module Initialisation failed"); }
     while (!SerialUSB) {; }
     }
+
     SerialUSB.println("Initialising System..........\n");    
 
-                            // pinMode
+                   // Pin Modes
 
     pinMode (SideSwitchPin_Right,INPUT_PULLUP);
     pinMode (SideSwitchPin_Left,INPUT_PULLUP);
@@ -83,17 +94,17 @@ void setup() {
     pinMode (CentreSwitchPin_Right,INPUT_PULLUP);
     pinMode (CentreSwitchPin_Left,INPUT_PULLUP);
 
-                         //Setup up connection
+                 //Update Device Info
 
-                 //DEV INFO*
-    sendData("AT+CDEVEUI=" + String(DEVEUI), 200, false);     //set DEVEUI
+    sendData("AT+CDEVEUI=" + String(DEVEUI), 200, false);     //set DEVEUI 
     sendData("AT+CAPPEUI=" + String(APPEUI), 200, false);    //set APPEUI
     sendData("AT+CAPPKEY=" + String(APPKEY), 200, false);   //set APPKEY
 
-    SerialUSB.println("Connecting to Gateway......");
-    SerialUSB.println();
-    Connection_check = sendData("AT+CJOIN=1,0,10,1", 10000, false);           // join lorawan         every 10 seconds,2 total attempts
 
+                // Connect to Gateway
+
+    SerialUSB.println("Connecting to Gateway......");
+    Connection_check = sendData("AT+CJOIN=1,0,10,1", 10000, false);           // join lorawan         every 10 seconds, 2 total attempts
 
     delay(400);
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
@@ -110,85 +121,72 @@ void setup() {
     SerialUSB.println();
   }
 
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void loop() {
   
-       // Reading sensor output
+       // Reading Values from sensor
 
   SideSwitchVal_Right =digitalRead(SideSwitchPin_Right);           
   SideSwitchVal_Left =digitalRead(SideSwitchPin_Left); 
  
   CentreSwitchVal_Right =digitalRead(CentreSwitchPin_Right);  
-  CentreSwitchVal_Left =digitalRead(CentreSwitchPin_Left);          
+  CentreSwitchVal_Left =digitalRead(CentreSwitchPin_Left); 
+
+           //Sensor Logic         
 
 if (SideSwitchVal_Right==1 && CentreSwitchVal_Right==0)             //Right side Alarm state
     {
     RightAlarm_currentState=LOW; 
-
-    if((millis()-previousMillis3)>Display_interval){
-    
-    previousMillis3=millis();}
-       
     }else{
     RightAlarm_currentState= HIGH; 
-
-    if((millis()-previousMillis3)>Display_interval){ 
-    previousMillis3=millis();}  
     }
- 
+
 if (SideSwitchVal_Left==1 && CentreSwitchVal_Left==0)              //Left side Alarm state
     {
-      if((millis()-previousMillis2)>Display_interval){
-      
-      previousMillis2=millis(); }
-    
     LeftAlarm_currentState=LOW;
-}else{
+    }else{
     LeftAlarm_currentState=HIGH;
-    
-
-    if((millis()-previousMillis2)>Display_interval){
-    
-    previousMillis2=millis(); }   
-
     }
 
-                 //overall Alarm State
+             //Alarm State
 if (RightAlarm_currentState !=RightAlarm_lastState)
 {                                       
   UpdateState("Right");} 
-  
   RightAlarm_lastState = RightAlarm_currentState;     
 
-if (LeftAlarm_currentState !=LeftAlarm_lastState){
+if (LeftAlarm_currentState !=LeftAlarm_lastState)
+{
   UpdateState("Left");}
-  
   LeftAlarm_lastState = LeftAlarm_currentState;
 
-         //Alarm Logic      
+         //Send Alert Logic      
              
 if (LeftAlarm_currentState == HIGH                                                     //sends alert after timer
     && Alert_sent == LOW 
     && (millis()-startMillis_Left>Breach_duration ))
     {
-      Trigger=13200;
+      Trigger=13200;                                  //What caused the alert
       UpdateState("Alert");}
     
 if (RightAlarm_currentState == HIGH 
     && Alert_sent == LOW 
     && (millis()-startMillis_Right>Breach_duration ))
     
-    { Trigger=13300;
+    { Trigger=13300;                                //What caused the alert
       UpdateState("Alert");
       }
 
 if (BoxAlarm_currentState == HIGH 
     && Alert_sent == LOW )
     
-    { Trigger=13400;
+    { Trigger=13400;                            //What caused the alert
       UpdateState("Alert");
       }
 
-                       //sending Alert lora payload
+                       //Sending Alert Payload
+
 if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) ) 
 
 { 
@@ -204,47 +202,47 @@ if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) )
           current_val+=5;
         }
         Status_code+=current_val;
-        SendPayload(Status_code);
 
+        SendPayload(Status_code);    //Calling the sendpayload function
         current_val=0;
-
         previousMillis=millis();
         }
 
 if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_currentState == LOW &&  Alert_sent == HIGH)     //Box
 { 
   UpdateState("Alert");
-  SerialUSB.println("Alert Level Low");
+  SerialUSB.println("Alert Level LOW");
                    
   }
 
+
+              //Send Still alive Payload
+
 if ((millis()-previousMillis)>Still_alive_interval){
-
   { 
-
       Trigger=13500;
       int current_val=0;                           // add current fence state info to alert message
       Status_code=Trigger;
-        if(LeftAlarm_currentState==HIGH){
-          current_val+=1;
-        }
-        if(RightAlarm_currentState==HIGH){
-          current_val+=2;
-        }
-        if(BoxAlarm_currentState==HIGH){
-          current_val+=5;
-        }
-        Status_code+=current_val;
-        SendPayload(Status_code);
 
-        current_val=0;
+      if(LeftAlarm_currentState==HIGH){
+        current_val+=1;
+      }
+      if(RightAlarm_currentState==HIGH){
+        current_val+=2;
+      }
+      if(BoxAlarm_currentState==HIGH){
+        current_val+=5;
+      }
+      Status_code+=current_val;
+      SendPayload(Status_code);               //Calling the sendpayload function
 
-        previousMillis=millis();
-        }
-
+      current_val=0;
+      previousMillis=millis();
+      }
+}
 }
 
-}
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void UpdateState(String Side){
  
