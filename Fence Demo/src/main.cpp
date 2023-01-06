@@ -200,11 +200,7 @@ if (BoxAlarm_currentState == HIGH
 
 if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) ) 
 
-{ 
-
-  
-
-  
+{   
        int current_val=0;                           // add current fence state info to alert message
        Status_code=Trigger;
         if(LeftAlarm_currentState==HIGH){

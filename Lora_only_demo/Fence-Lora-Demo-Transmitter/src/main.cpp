@@ -1,8 +1,7 @@
-//PIns 10,9,2 not to be used
+//PIns 10,9,2 not to be used     //A4 - SDA       A5 - SCL
 
 #include <Arduino.h>
 #include <SPI.h>
-
 #include <RH_RF95.h>
 
 #define DEBUG true
@@ -22,16 +21,13 @@ int SideSwitchPin_Left=7;
 int CentreSwitchPin_Right=6;
 int CentreSwitchPin_Left=5;
 
-const long Still_alive_interval= (10000);         // in seconds
+const long Still_alive_interval= (2000);         // in seconds
             
-const long Alert_interval = 1*(1000);                // seconds
 const int Breach_duration=4*(1000);     //in seconds
-const int Update_interval=4*(70);     //in seconds
 
 unsigned long startMillis_Right;
 unsigned long startMillis_Left;
 unsigned long previousMillis;
-unsigned long previousMillis_Update;
 
 int CentreSwitchVal_Right;
 int CentreSwitchVal_Left;
@@ -49,10 +45,10 @@ int BoxAlarm_currentState=LOW;                       //Change w
 
 int Alert_sent=LOW;
 int Status_code;
-int Trigger;
+int Trigger=13500;
 int Connection_status;
 
-void Send_LoraPayload(int msg);
+void Send_LoraPayload(int msg, int alert);
 void UpdateState(String Side);
 
 void setup() 
@@ -92,7 +88,7 @@ void setup()
    
                          //Setup up connection
 
-    Send_LoraPayload(13500);         //setup connection
+    Send_LoraPayload(13500,0);         //setup connection
 
     Serial.println("Monitoring System Active"); 
     Serial.println();
@@ -143,14 +139,14 @@ if (LeftAlarm_currentState == HIGH                                              
     && Alert_sent == LOW 
     && (millis()-startMillis_Left>Breach_duration ))
     {
-      Trigger=16200;
+      Trigger=13200;
       UpdateState("Alert");}
     
 if (RightAlarm_currentState == HIGH 
     && Alert_sent == LOW 
     && (millis()-startMillis_Right>Breach_duration ))
     
-    { Trigger=16300;
+    { Trigger=13300;
       UpdateState("Alert");
       }
 
@@ -161,28 +157,6 @@ if (BoxAlarm_currentState == HIGH
       UpdateState("Alert");
       }
 
-                       //sending Alert lora payload
-if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) ) 
-
-{ 
-       int current_val=0;                           // add current fence state info to alert message
-       Status_code=16000;
-        if(LeftAlarm_currentState==HIGH){
-          current_val+=1;
-        }
-        if(RightAlarm_currentState==HIGH){
-          current_val+=2;
-        }
-        if(BoxAlarm_currentState==HIGH){
-          current_val+=5;
-        }
-        Status_code+=current_val;
-        Send_LoraPayload(Status_code);
-
-        current_val=0;
-
-        previousMillis=millis();
-        }
 
 if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_currentState == LOW &&  Alert_sent == HIGH)     //Box
 { 
@@ -208,7 +182,7 @@ if ((millis()-previousMillis)>Still_alive_interval){
           current_val+=5;
         }
         Status_code+=current_val;
-        Send_LoraPayload(Status_code);
+        Send_LoraPayload(Status_code,Alert_sent);
 
         current_val=0;
 
@@ -232,52 +206,41 @@ void UpdateState(String Side){
             }  //check left side alarm state
  }
 
-  if (Side=="Alert")  //check right side alarm state
-            {Alert_sent=!Alert_sent;
-            if(Alert_sent==LOW)
-            {
-              previousMillis=millis();
-              
-              }
-            }
-
-  if (((millis()-previousMillis_Update)>Update_interval) )     //Send update
-
+  if (Side=="Alert")  
     {
-      Trigger=13500;
-      int current_val=0;                           // add current fence state info to alert message
-      Status_code=Trigger;
-      if(LeftAlarm_currentState==HIGH){
-          current_val+=1;
-        }
-        if(RightAlarm_currentState==HIGH){
-          current_val+=2;
-        }
-        if(BoxAlarm_currentState==HIGH){
-          current_val+=5;
-        }
-        Status_code+=current_val;
-        Send_LoraPayload(Status_code);
+      Alert_sent=!Alert_sent;
+    }
 
-        current_val=0;
-        previousMillis_Update=millis();
+//Sending update
+  int current_val=0;                           // add current fence state info to update message
+  Status_code=Trigger;
+  if(LeftAlarm_currentState==HIGH){
+      current_val+=1;
+    }
+    if(RightAlarm_currentState==HIGH){
+      current_val+=2;
+    }
+    if(BoxAlarm_currentState==HIGH){
+      current_val+=5;
+    }
+    Status_code+=current_val;
+    Send_LoraPayload(Status_code,Alert_sent);
+
+    current_val=0;
+    previousMillis=millis();
+    delay(20);
         }  
-                          }
-
-void Send_LoraPayload(int msg){
-
-    if (DEBUG) {
-      
-        Serial.print("Sending Status_code: ");
-        Serial.println(msg);
-      }
+                          
+void Send_LoraPayload(int msg, int alert){
 
   char HEXpayload[51] = "";
-  sprintf(HEXpayload,"%i%i",msg,LoRaID);
+  sprintf(HEXpayload,"%i%i%i",msg,LoRaID,alert);
 
-  Serial.println(HEXpayload);    
-  Serial.println("Sending..."); delay(20);
-  rf95.send((uint8_t *)HEXpayload, 10);
+  Serial.println(HEXpayload);
+      
+  Serial.println("Sending...");
+
+  rf95.send((uint8_t *)HEXpayload, 11);
 
   Serial.println("Waiting for packet to complete..."); delay(20);
   rf95.waitPacketSent();
