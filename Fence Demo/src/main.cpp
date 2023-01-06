@@ -1,8 +1,16 @@
-        //Included Libraries 
+        //Included Libraries  //DONT USE PIN 5 (reset pin)
 
 #include <Arduino.h>
 #include <CayenneLPP.h>
 #include <iostream>
+
+       //Temperature
+
+#include <dht11.h>
+dht11 DHT;
+#define DHT11_PIN 10
+int chk;
+
 
         //DEBUG STATE
 
@@ -13,6 +21,11 @@
 #define DEVEUI "D896E0FF00000468"                                //set 
 #define APPEUI "70B3D57ED0041DA0"
 #define APPKEY "15993DDDAFFA0D7D32D515A419743EE6" 
+
+     //test
+// #define DEVEUI "D896E0FF00000687"                                //set 
+// #define APPEUI "70B3D57ED0041DA0"
+// #define APPKEY "FF1FA6B66A5BB0E622A11C95BAE9C746" 
 
         //Input Pins
 
@@ -188,6 +201,10 @@ if (BoxAlarm_currentState == HIGH
 if (Alert_sent==HIGH && ((millis()-previousMillis)>Alert_interval) ) 
 
 { 
+
+  
+
+  
        int current_val=0;                           // add current fence state info to alert message
        Status_code=Trigger;
         if(LeftAlarm_currentState==HIGH){
@@ -313,6 +330,13 @@ void SendPayload(int msg){
     }
 
     lpp.reset();                                           //Build Payload
+
+    //TEMP
+
+    chk = DHT.read(DHT11_PIN);
+    lpp.addTemperature(1,(DHT.temperature));
+    lpp.addRelativeHumidity(1,(DHT.humidity));
+
     lpp.addLuminosity(1,msg);
     
     int size = lpp.getSize();
@@ -323,7 +347,13 @@ void SendPayload(int msg){
     }
     char HEXpayload[51] = "";
 
-    sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);  
+    // SerialUSB.println("\nSIZE TEMPERATURE");
+
+    // SerialUSB.println(DHT.temperature);
+    // SerialUSB.println(DHT.humidity);
+
+    // sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
+    sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3], payload[4], payload[5], payload[6], payload[7], payload[8], payload[9], payload[10]);  
     
     Send_check = sendData((String)HEXpayload, 2000, false);
     delay(500);   
@@ -342,14 +372,12 @@ void SendPayload(int msg){
     }else{
         SerialUSB.println("RECV check FAILED");
         Connection_status=0;
-
         SerialUSB.println("Attempting Resend [1 of 1]..............\n");
 
         Reconnect();
        
         Send_check = sendData((String)HEXpayload, 2000, false);
         delay(500);
-        
 
         if(Send_check.indexOf("OK+SEND") > 0){
         SerialUSB.println("\nSEND check OK");
@@ -374,7 +402,7 @@ void Reconnect(){
 
   SerialUSB.println("Attempting Reconnection [1 of 3]..............\n");
   Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt
-  delay(500); 
+  delay(1000); 
 
   if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
     SerialUSB.println("Reconnection to Gateway Successful");
@@ -385,7 +413,7 @@ void Reconnect(){
     SerialUSB.println("Reconnection to Gateway Failed \n");
     SerialUSB.println("Attempting Reconnection [2 of 3]..............\n");
     Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-    delay(500); 
+    delay(1000); 
       
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
       SerialUSB.println("Reconnection to Gateway Successful");
@@ -397,7 +425,7 @@ void Reconnect(){
       
       SerialUSB.println("Attempting Reconnection [3 of 3]..............\n");
       Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-      delay(500); 
+      delay(1000); 
       
       if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Reconnection to Gateway Successful");

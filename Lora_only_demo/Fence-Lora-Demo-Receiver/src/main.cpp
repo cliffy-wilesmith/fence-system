@@ -5,6 +5,8 @@
 #include <SPI.h>
 #include <CayenneLPP.h>
 #include <RH_RF95.h>
+#include <Wire.h>                //A4 - SDA       A5 - SCL
+
  
 #define RFM95_CS 10
 #define RFM95_RST 9
@@ -35,10 +37,12 @@ int Right_LED_Values;
 int Status_LED_Values;
 int Alert_LED_Values;
 
+byte buf[10];
+
 int Alert_code_array[ 9 ][ 3 ] ={ { 0, 0, 0 }, { 1, 0, 0 },{ 0, 1, 0 }, { 1, 1, 0 },{ 0, 0, 1 },{ 0, 0, 1 }, { 1, 0, 1 },{ 0, 1, 1 }, { 1, 1, 1 } };   //array to hold LED values based on status code
 
 
-const long Still_alive_interval= (60500);
+const long Still_alive_interval= (11000);
 unsigned long previousMillis=0;
 
 void setup() 
@@ -55,8 +59,10 @@ void setup()
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
  
-  // while (!Serial);
+ 
   Serial.begin(9600);
+  Wire.begin();
+
   delay(100);
  
   Serial.println("Arduino LoRa RX Test!");
@@ -82,6 +88,7 @@ void setup()
 
   rf95.setTxPower(23, false);
 }
+
  
 void loop()
 {
@@ -94,7 +101,7 @@ void loop()
     if (rf95.recv(buf, &len))
     {
      
-    RH_RF95::printBuffer("Received: ", buf, len);
+    // RH_RF95::printBuffer("Received: ", buf, len);
    
     String HEXpayload=((char*)buf);
     // Serial.println(HEXpayload);
@@ -104,7 +111,7 @@ void loop()
     String lights = status_code.substring(4,5);
     String Alert_LED_Values = status_code.substring(1,2);
 
-    Serial.println(Alert_LED_Values);
+    // Serial.println(Alert_LED_Values);
     
     
     
@@ -133,7 +140,24 @@ void loop()
       if (6==(Alert_LED_Values.toInt())){
 
         digitalWrite(Alert_YELLOW_Pin, HIGH);
-      
+
+        status_code.getBytes(buf, 5);
+              Serial.println(buf[0]);
+        Serial.println(buf[1]);
+        Serial.println(buf[2]);
+        Serial.println(buf[3]);
+        
+        
+
+        Wire.beginTransmission(4); // transmit to device #4
+        
+        Wire.write(buf[0]);              // sends one byte 
+        Wire.write(buf[1]);
+        Wire.write(buf[2]);
+        Wire.write(buf[3]);
+  
+        
+        Wire.endTransmission();    // stop transmitting
       }else{
         digitalWrite(Alert_YELLOW_Pin, LOW);
       }

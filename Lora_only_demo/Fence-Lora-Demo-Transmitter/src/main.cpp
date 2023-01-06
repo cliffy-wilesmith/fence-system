@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 #include <SPI.h>
-#include <CayenneLPP.h>
+
 #include <RH_RF95.h>
 
 #define DEBUG true
@@ -12,24 +12,21 @@
 #define RFM95_INT 2
 #define RF95_FREQ 868.0
 
-// CayenneLPP lpp(51);  //payloadd size5s
-
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
-// int16_t packetnum = 100;  // packet counter, we increment per xmission
 
 const int LoRaID=66;                                 //set  range:16-255 
 
-int SideSwitchPin_Right=5;
+int SideSwitchPin_Right=8;
 int SideSwitchPin_Left=7;
 
-int CentreSwitchPin_Right=4;
-int CentreSwitchPin_Left=8;
+int CentreSwitchPin_Right=6;
+int CentreSwitchPin_Left=5;
 
-const long Still_alive_interval= (60000);         // in seconds
-// const long All_clear_delay= 10*(1000);            
+const long Still_alive_interval= (10000);         // in seconds
+            
 const long Alert_interval = 1*(1000);                // seconds
-const int Breach_duration=5*(1000);     //in seconds
-const int Update_interval=3*(70);     //in seconds
+const int Breach_duration=4*(1000);     //in seconds
+const int Update_interval=4*(70);     //in seconds
 
 unsigned long startMillis_Right;
 unsigned long startMillis_Left;
@@ -97,7 +94,7 @@ void setup()
 
     Send_LoraPayload(13500);         //setup connection
 
-    Serial.println("Monitoring System Active");               //start fence monitoring regardless of connection status
+    Serial.println("Monitoring System Active"); 
     Serial.println();
 }
 
@@ -108,24 +105,19 @@ void loop()
   SideSwitchVal_Right =digitalRead(SideSwitchPin_Right);           
   SideSwitchVal_Left =digitalRead(SideSwitchPin_Left); 
 
-  // SideSwitchVal_Left=1;   //no left side code
-
   CentreSwitchVal_Right =digitalRead(CentreSwitchPin_Right);  
   CentreSwitchVal_Left =digitalRead(CentreSwitchPin_Left);  
 
-  // CentreSwitchVal_Left=0;    //no left side code
-
-  if (SideSwitchVal_Right==0 && CentreSwitchVal_Right==1)             //Right side Alarm state
+  if (SideSwitchVal_Right==1 && CentreSwitchVal_Right==0)             //Right side Alarm state
     {
     RightAlarm_currentState=LOW; 
-    // SerialUSB.println("RIGHT FINE");   
+      
     }else{
     RightAlarm_currentState= HIGH; 
-    // SerialUSB.println("RIGHT ALERT"); 
      
     }
  
-if (SideSwitchVal_Left==0 && CentreSwitchVal_Left==1)              //Left side Alarm state
+if (SideSwitchVal_Left==1 && CentreSwitchVal_Left==0)              //Left side Alarm state
     {
     
     LeftAlarm_currentState=LOW;
@@ -196,7 +188,6 @@ if (BoxAlarm_currentState==LOW && LeftAlarm_currentState == LOW && RightAlarm_cu
 { 
   UpdateState("Alert");
   Serial.println("ALERT LEVEL LOW");
-  // Send_LoraPayload(13500);
                    
   }
 
@@ -285,10 +276,10 @@ void Send_LoraPayload(int msg){
   sprintf(HEXpayload,"%i%i",msg,LoRaID);
 
   Serial.println(HEXpayload);    
-  Serial.println("Sending..."); delay(10);
+  Serial.println("Sending..."); delay(20);
   rf95.send((uint8_t *)HEXpayload, 10);
 
-  Serial.println("Waiting for packet to complete..."); delay(10);
+  Serial.println("Waiting for packet to complete..."); delay(20);
   rf95.waitPacketSent();
   Serial.println("Packet Sent");
         }
