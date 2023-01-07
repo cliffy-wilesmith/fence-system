@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <Arduino.h>
 #include <SPI.h>
-#include <CayenneLPP.h>
 #include <RH_RF95.h>
 #include <Wire.h>                //A4 - SDA       A5 - SCL
 
@@ -35,7 +34,7 @@ int LoraID ;
 int Left_LED_Values;
 int Right_LED_Values;
 int Status_LED_Values;
-int Alert_LED_Values;
+int Alert_Value;
 
 byte buf[10];
 
@@ -109,9 +108,13 @@ void loop()
     String status_code = HEXpayload.substring(0,5);
     String LoraID = HEXpayload.substring(5,7);
     String lights = status_code.substring(4,5);
-    String Alert_LED_Values = status_code.substring(1,2);
+    String Alert_Value = HEXpayload.substring(7,8);
 
-    // Serial.println(Alert_LED_Values);
+    Serial.println("HEXpayload");
+    Serial.println(HEXpayload);
+
+    Serial.println("Alert_Value");
+    Serial.println(Alert_Value);
     
     
     
@@ -137,27 +140,27 @@ void loop()
 
       digitalWrite(System_BLUE_Pin, !Status_LED_Values);
 
-      if (6==(Alert_LED_Values.toInt())){
+      if (1==(Alert_Value.toInt())){
 
         digitalWrite(Alert_YELLOW_Pin, HIGH);
 
-        status_code.getBytes(buf, 5);
-              Serial.println(buf[0]);
-        Serial.println(buf[1]);
-        Serial.println(buf[2]);
-        Serial.println(buf[3]);
+        // status_code.getBytes(buf, 5);
+        //       Serial.println(buf[0]);
+        // Serial.println(buf[1]);
+        // Serial.println(buf[2]);
+        // Serial.println(buf[3]);
         
         
 
-        Wire.beginTransmission(4); // transmit to device #4
+        // Wire.beginTransmission(4); // transmit to device #4
         
-        Wire.write(buf[0]);              // sends one byte 
-        Wire.write(buf[1]);
-        Wire.write(buf[2]);
-        Wire.write(buf[3]);
+        // Wire.write(buf[0]);              // sends one byte 
+        // Wire.write(buf[1]);
+        // Wire.write(buf[2]);
+        // Wire.write(buf[3]);
   
         
-        Wire.endTransmission();    // stop transmitting
+        // Wire.endTransmission();    // stop transmitting
       }else{
         digitalWrite(Alert_YELLOW_Pin, LOW);
       }
