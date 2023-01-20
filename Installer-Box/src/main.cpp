@@ -27,11 +27,6 @@ void loop() {
   SideSwitchVal =digitalRead(SideSwitchPin);           
   CentreSwitchVal =digitalRead(CentreSwitchPin);
 
-  // Serial.print("Centre--------------------------");
-  // Serial.println(CentreSwitchVal);
-  // Serial.print("Side");
-  // Serial.println(SideSwitchVal);
-
   if (SideSwitchVal==1 && CentreSwitchVal==0)           
   {
     digitalWrite(RED_Pin, LOW);

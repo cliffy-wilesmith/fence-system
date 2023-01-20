@@ -2,10 +2,7 @@
 #include <Wire.h>
 #include <CayenneLPP.h>
 
-
 #define DEBUG true
-
-
 
      //test
 #define DEVEUI "D896E0FF00000687"                                //set 
@@ -16,24 +13,24 @@ CayenneLPP lpp(51);  //payloadd size
 String sendData(String command, const int timeout, boolean debug);
 void SendPayload(int msg);
 
-
     //Connection Variables
 
 int Connection_status;
 String Connection_check;
 String Send_check;
+String myString;
 
 void Reconnect();
-
 void receiveEvent(int howMany);
 
-byte Status_byteArray[4];
+
 
 
 void setup()
 {
+  
 
-    Serial1.begin(115200);           //Start up LORAWAN module
+  Serial1.begin(115200);           //Start up LORAWAN module
 
   if (true){                                                    //DEBUG CODE
   SerialUSB.begin(115200);
@@ -50,9 +47,9 @@ void setup()
   // Connect to Gateway
 
   SerialUSB.println("Connecting to Gateway......");
-  Connection_check = sendData("AT+CJOIN=1,0,10,1", 10000, false);           // join lorawan         every 10 seconds, 2 total attempts
+  Connection_check = sendData("AT+CJOIN=1,0,10,3", 10000, false);           // join lorawan         every 10 seconds, 2 total attempts
 
-  delay(400);
+  delay(3000);
   if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
       SerialUSB.println("Connection to Gateway Successful");
       SerialUSB.println();
@@ -74,34 +71,50 @@ void setup()
 void loop()
 {
   delay(100);
-
-  
 }
 
 // function that executes whenever data is received from master
 // this function is registered as an event, see setup()
 void receiveEvent(int howMany)
 {
+
   while(1 < Wire.available()) // loop through all but the last
   {
-    // byte c = Wire.read(); // receive byte as a character
+    
+    byte Status_byteArray[5];
     Status_byteArray[0]=Wire.read();
     Status_byteArray[1]=Wire.read();
     Status_byteArray[2]=Wire.read();
     Status_byteArray[3]=Wire.read();
-    // SerialUSB.print("/space/");         // print the character
-     
-  }
+    Status_byteArray[4]=Wire.read();
+         
+  
   String myString = String((char *)Status_byteArray);
+
+  SerialUSB.println("worked"); 
+
   SerialUSB.print(Status_byteArray[0]);
   SerialUSB.print(Status_byteArray[1]);
   SerialUSB.print(Status_byteArray[2]);
   SerialUSB.print(Status_byteArray[3]);
-  // int x = Wire.read();    // receive byte as an integer
-  SerialUSB.println("Strng");         // print the integer
+  SerialUSB.print(Status_byteArray[4]);
+
+  SerialUSB.println("  String 1:");         // print the integer
   SerialUSB.println(myString);
-  // if (x==144){
-  // SendPayload(13200);}
+  
+  
+  
+  // int x = Wire.read();    // receive byte as an integer
+ SerialUSB.println("  String 2:");
+  SerialUSB.println(myString);
+  
+  if (myString!="13502" && myString!="13501" && myString!="13503" && myString!="NA" && myString!="SENT" ){
+
+  int load=myString.toInt();
+  SendPayload(load);
+  String myString = "SENT";
+  }
+  }
 }
        // Send Data Function
 
@@ -124,8 +137,6 @@ String sendData(String command, const int timeout, boolean debug)
     }
     return response;
 }
-
-
             // Send Payload Function
 
 void SendPayload(int msg){
@@ -163,10 +174,9 @@ void SendPayload(int msg){
     char HEXpayload[51] = "";
 
     sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
-    // sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3], payload[4], payload[5], payload[6], payload[7], payload[8], payload[9], payload[10]);  
-    
+      
     Send_check = sendData((String)HEXpayload, 2000, false);
-    delay(500);   
+    delay(2000);   
 
     if(Send_check.indexOf("OK+SEND") > 0){
       SerialUSB.println("\nSEND check OK");
@@ -187,7 +197,7 @@ void SendPayload(int msg){
         Reconnect();
        
         Send_check = sendData((String)HEXpayload, 2000, false);
-        delay(500);
+        delay(2000);
 
         if(Send_check.indexOf("OK+SEND") > 0){
         SerialUSB.println("\nSEND check OK");
@@ -212,7 +222,7 @@ void Reconnect(){
 
   SerialUSB.println("Attempting Reconnection [1 of 3]..............\n");
   Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt
-  delay(1000); 
+  delay(5000); 
 
   if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
     SerialUSB.println("Reconnection to Gateway Successful");
@@ -223,7 +233,7 @@ void Reconnect(){
     SerialUSB.println("Reconnection to Gateway Failed \n");
     SerialUSB.println("Attempting Reconnection [2 of 3]..............\n");
     Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-    delay(1000); 
+    delay(5000); 
       
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
       SerialUSB.println("Reconnection to Gateway Successful");
@@ -235,7 +245,7 @@ void Reconnect(){
       
       SerialUSB.println("Attempting Reconnection [3 of 3]..............\n");
       Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-      delay(1000); 
+      delay(5000); 
       
       if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Reconnection to Gateway Successful");

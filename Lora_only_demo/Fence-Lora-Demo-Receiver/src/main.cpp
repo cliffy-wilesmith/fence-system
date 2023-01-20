@@ -6,7 +6,6 @@
 #include <RH_RF95.h>
 #include <Wire.h>                //A4 - SDA       A5 - SCL
 
- 
 #define RFM95_CS 10
 #define RFM95_RST 9
 #define RFM95_INT 2
@@ -36,7 +35,7 @@ int Right_LED_Values;
 int Status_LED_Values;
 int Alert_Value;
 
-byte buf[10];
+
 
 int Alert_code_array[ 9 ][ 3 ] ={ { 0, 0, 0 }, { 1, 0, 0 },{ 0, 1, 0 }, { 1, 1, 0 },{ 0, 0, 1 },{ 0, 0, 1 }, { 1, 0, 1 },{ 0, 1, 1 }, { 1, 1, 1 } };   //array to hold LED values based on status code
 
@@ -86,6 +85,9 @@ void setup()
   Serial.print("Set Freq to: "); Serial.println(RF95_FREQ);
 
   rf95.setTxPower(23, false);
+
+  Wire.setWireTimeout(25000 , true);
+
 }
 
  
@@ -99,9 +101,7 @@ void loop()
     
     if (rf95.recv(buf, &len))
     {
-     
-    // RH_RF95::printBuffer("Received: ", buf, len);
-   
+    
     String HEXpayload=((char*)buf);
     // Serial.println(HEXpayload);
 
@@ -115,10 +115,6 @@ void loop()
 
     Serial.println("Alert_Value");
     Serial.println(Alert_Value);
-    
-    
-    
-    // Serial.println(lights.toInt());
     
     if (LoraID_check==(LoraID.toInt()))
     {
@@ -144,23 +140,38 @@ void loop()
 
         digitalWrite(Alert_YELLOW_Pin, HIGH);
 
-        // status_code.getBytes(buf, 5);
-        //       Serial.println(buf[0]);
-        // Serial.println(buf[1]);
-        // Serial.println(buf[2]);
-        // Serial.println(buf[3]);
-        
-        
 
-        // Wire.beginTransmission(4); // transmit to device #4
+        byte buf[status_code.length() + 1];
+
+        status_code.getBytes(buf, status_code.length() + 1);
+
+        Serial.println("Buffer Size");
+        Serial.println(status_code.length() + 1);
+        Serial.println("Buffer Content");
+
+        Serial.println(buf[0]);
+        Serial.println(buf[1]);
+        Serial.println(buf[2]);
+        Serial.println(buf[3]);
+        Serial.println(buf[4]);
+        // Serial.println(buf[5]);
+
+        Wire.beginTransmission(4); // transmit to device #4
         
-        // Wire.write(buf[0]);              // sends one byte 
-        // Wire.write(buf[1]);
-        // Wire.write(buf[2]);
-        // Wire.write(buf[3]);
-  
-        
+        Wire.write(buf[0]);              // sends one byte 
+        Wire.write(buf[1]);
+        Wire.write(buf[2]);
+        Wire.write(buf[3]);
+        Wire.write(buf[4]);
+
         // Wire.endTransmission();    // stop transmitting
+
+          byte error = Wire.endTransmission(); // run transaction
+          if (error) {
+             Serial.println("Error occured when writing");
+         if (error == 5)
+          Serial.println("It was a timeout");
+  }
       }else{
         digitalWrite(Alert_YELLOW_Pin, LOW);
       }

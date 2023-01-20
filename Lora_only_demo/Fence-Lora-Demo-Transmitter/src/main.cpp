@@ -23,7 +23,7 @@ int CentreSwitchPin_Left=5;
 
 const long Still_alive_interval= (2000);         // in seconds
             
-const int Breach_duration=4*(1000);     //in seconds
+const int Breach_duration=2.4*(1000);     //in seconds
 
 unsigned long startMillis_Right;
 unsigned long startMillis_Left;
@@ -92,6 +92,7 @@ void setup()
 
     Serial.println("Monitoring System Active"); 
     Serial.println();
+
 }
 
 void loop()
