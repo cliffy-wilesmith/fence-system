@@ -6,11 +6,13 @@
 
      //test
 #define DEVEUI "D896E0FF00000687"                                //set 
-#define APPEUI "70B3D57ED0041DA0"
-#define APPKEY "FF1FA6B66A5BB0E622A11C95BAE9C746" 
+// #define APPEUI "70B3D57ED0041DA0"
+// #define APPKEY "FF1FA6B66A5BB0E622A11C95BAE9C746"
+#define APPEUI "70B3D57ED0041DA8"
+#define APPKEY "FF1FA6B66A5BB0E622A11C95BAE9C747"   // URSALINK 
 
 CayenneLPP lpp(51);  //payloadd size
-String sendData(String command, const int timeout, boolean debug);
+String sendData(String command, unsigned long timeout, boolean debug);
 void SendPayload(int msg);
 
     //Connection Variables
@@ -23,13 +25,8 @@ String myString;
 void Reconnect();
 void receiveEvent(int howMany);
 
-
-
-
 void setup()
 {
-  
-
   Serial1.begin(115200);           //Start up LORAWAN module
 
   if (true){                                                    //DEBUG CODE
@@ -46,10 +43,19 @@ void setup()
 
   // Connect to Gateway
 
-  SerialUSB.println("Connecting to Gateway......");
-  Connection_check = sendData("AT+CJOIN=1,0,10,3", 10000, false);           // join lorawan         every 10 seconds, 2 total attempts
+  delay(5000);
 
-  delay(3000);
+  SerialUSB.println("Connecting to Gateway......");
+  delay(5000);
+
+  SerialUSB.println("STARTING............................");
+
+  
+  Connection_check = sendData("AT+CJOIN=1,0,6,0", 6100, false);           // join lorawan         every 10 seconds, 2 total attempts
+  SerialUSB.println("Done......................................//////");
+  SerialUSB.println(Connection_check);
+
+  
   if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
       SerialUSB.println("Connection to Gateway Successful");
       SerialUSB.println();
@@ -70,7 +76,9 @@ void setup()
 
 void loop()
 {
-  delay(100);
+  delay(20000);
+  SendPayload(20002);
+
 }
 
 // function that executes whenever data is received from master
@@ -118,15 +126,19 @@ void receiveEvent(int howMany)
 }
        // Send Data Function
 
-String sendData(String command, const int timeout, boolean debug)
+String sendData(String command, unsigned long timeout, boolean debug)
 { 
     String response=""; 
     Serial1.println(command);
-    long int time = millis();
-    while ((time + timeout) > millis())
+    unsigned long time = millis();
+    SerialUSB.print("about to");
+    while ((time + timeout)>millis())
     {
+      
         while (Serial1.available())
         {
+
+          // SerialUSB.print("doing");
             char c = Serial1.read();
             response += c;
         }
@@ -148,7 +160,7 @@ void SendPayload(int msg){
 
     if (Connection_status==0){                                                           //check if connected to gateway
       SerialUSB.println("\n NOT CONNECTED to Gateway \n");
-      Reconnect();                                                                           //try to reconnect
+      // Reconnect();                                                                           //try to reconnect
 
        if (Connection_status==0){                     //Checking Reconnect
         SerialUSB.println("ALERT Can NOT be SENT");
@@ -161,8 +173,6 @@ void SendPayload(int msg){
     }
 
     lpp.reset();                                           //Build Payload
-
-
     lpp.addLuminosity(1,msg);
     
     int size = lpp.getSize();
@@ -175,8 +185,8 @@ void SendPayload(int msg){
 
     sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
       
-    Send_check = sendData((String)HEXpayload, 2000, false);
-    delay(2000);   
+    Send_check = sendData((String)HEXpayload, 3000, false);
+    // delay(2000);   
 
     if(Send_check.indexOf("OK+SEND") > 0){
       SerialUSB.println("\nSEND check OK");
@@ -194,10 +204,10 @@ void SendPayload(int msg){
         Connection_status=0;
         SerialUSB.println("Attempting Resend [1 of 1]..............\n");
 
-        Reconnect();
+        // Reconnect();/////////////////////////////
        
-        Send_check = sendData((String)HEXpayload, 2000, false);
-        delay(2000);
+        Send_check = sendData((String)HEXpayload, 3000, false);
+        // delay(2000);
 
         if(Send_check.indexOf("OK+SEND") > 0){
         SerialUSB.println("\nSEND check OK");
