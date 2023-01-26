@@ -22,7 +22,9 @@ String Connection_check;
 String Send_check;
 String myString;
 
-void Reconnect();
+int nub=20000;
+
+// void Reconnect();
 void receiveEvent(int howMany);
 
 void setup()
@@ -43,19 +45,15 @@ void setup()
 
   // Connect to Gateway
 
-  delay(5000);
-
   SerialUSB.println("Connecting to Gateway......");
   delay(5000);
 
   SerialUSB.println("STARTING............................");
 
-  
-  Connection_check = sendData("AT+CJOIN=1,0,6,0", 6100, false);           // join lorawan         every 10 seconds, 2 total attempts
+  Connection_check = sendData("AT+CJOIN=1,0,6,0", 6100, false);           // join lorawan         6 seconds, 1 total attempt
   SerialUSB.println("Done......................................//////");
-  SerialUSB.println(Connection_check);
+  // SerialUSB.println(Connection_check);
 
-  
   if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
       SerialUSB.println("Connection to Gateway Successful");
       SerialUSB.println();
@@ -64,25 +62,33 @@ void setup()
   }else{
       SerialUSB.println("Connection to Gateway Failed");
       SerialUSB.println();
-      Connection_status=0;}
+      Connection_status=1;
+      SerialUSB.println("Attempting Reconnection..............\n");
+      Connection_check = sendData("AT+CJOIN=1,0,6,0", 6100, false);          //try to reconnect      6 seconds, 1 total attempt  
+
+      if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+          SerialUSB.println("Reconnection to Gateway Successful");
+          Connection_status=1;
+      }else{
+        SerialUSB.println("Reconnection to Gateway Failed \n");
+        SerialUSB.println("Max attempts reached");
+        Connection_status=1;}
+  }
 
   SerialUSB.println("Monitoring System Active");               //start fence monitoring regardless of connection status
   SerialUSB.println();
 
   Wire.begin(4);                // join i2c bus with address #4
   Wire.onReceive(receiveEvent); // register event
-
 }
 
 void loop()
 {
   delay(20000);
-  SendPayload(20002);
+  SendPayload(nub++);
 
 }
 
-// function that executes whenever data is received from master
-// this function is registered as an event, see setup()
 void receiveEvent(int howMany)
 {
 
@@ -96,21 +102,18 @@ void receiveEvent(int howMany)
     Status_byteArray[3]=Wire.read();
     Status_byteArray[4]=Wire.read();
          
-  
   String myString = String((char *)Status_byteArray);
 
-  SerialUSB.println("worked"); 
+  // SerialUSB.println("worked"); 
 
-  SerialUSB.print(Status_byteArray[0]);
-  SerialUSB.print(Status_byteArray[1]);
-  SerialUSB.print(Status_byteArray[2]);
-  SerialUSB.print(Status_byteArray[3]);
-  SerialUSB.print(Status_byteArray[4]);
+  // SerialUSB.print(Status_byteArray[0]);
+  // SerialUSB.print(Status_byteArray[1]);
+  // SerialUSB.print(Status_byteArray[2]);
+  // SerialUSB.print(Status_byteArray[3]);
+  // SerialUSB.print(Status_byteArray[4]);
 
-  SerialUSB.println("  String 1:");         // print the integer
-  SerialUSB.println(myString);
-  
-  
+  // SerialUSB.println("  String 1:");         // print the integer
+  // SerialUSB.println(myString);
   
   // int x = Wire.read();    // receive byte as an integer
  SerialUSB.println("  String 2:");
@@ -137,8 +140,6 @@ String sendData(String command, unsigned long timeout, boolean debug)
       
         while (Serial1.available())
         {
-
-          // SerialUSB.print("doing");
             char c = Serial1.read();
             response += c;
         }
@@ -186,7 +187,7 @@ void SendPayload(int msg){
     sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
       
     Send_check = sendData((String)HEXpayload, 3000, false);
-    // delay(2000);   
+     
 
     if(Send_check.indexOf("OK+SEND") > 0){
       SerialUSB.println("\nSEND check OK");
@@ -201,13 +202,10 @@ void SendPayload(int msg){
 
     }else{
         SerialUSB.println("RECV check FAILED");
-        Connection_status=0;
+        Connection_status=1;
         SerialUSB.println("Attempting Resend [1 of 1]..............\n");
-
-        // Reconnect();/////////////////////////////
        
         Send_check = sendData((String)HEXpayload, 3000, false);
-        // delay(2000);
 
         if(Send_check.indexOf("OK+SEND") > 0){
         SerialUSB.println("\nSEND check OK");
@@ -228,45 +226,42 @@ void SendPayload(int msg){
 
 }
 
-void Reconnect(){
+// void Reconnect(){
 
-  SerialUSB.println("Attempting Reconnection [1 of 3]..............\n");
-  Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt
-  delay(5000); 
+//   SerialUSB.println("Attempting Reconnection [1 of 3]..............\n");
+//   Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt 
 
-  if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
-    SerialUSB.println("Reconnection to Gateway Successful");
-    Connection_status=1;
-    return;
+//   if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+//     SerialUSB.println("Reconnection to Gateway Successful");
+//     Connection_status=1;
+//     return;
 
-  }else{
-    SerialUSB.println("Reconnection to Gateway Failed \n");
-    SerialUSB.println("Attempting Reconnection [2 of 3]..............\n");
-    Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-    delay(5000); 
+//   }else{
+//     SerialUSB.println("Reconnection to Gateway Failed \n");
+//     SerialUSB.println("Attempting Reconnection [2 of 3]..............\n");
+//     Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
+    
       
-    if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
-      SerialUSB.println("Reconnection to Gateway Successful");
-      Connection_status=1;
-      return;
+//     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+//       SerialUSB.println("Reconnection to Gateway Successful");
+//       Connection_status=1;
+//       return;
 
-    }else{
-      SerialUSB.println("Reconnection to Gateway Failed \n");
+//     }else{
+//       SerialUSB.println("Reconnection to Gateway Failed \n");
       
-      SerialUSB.println("Attempting Reconnection [3 of 3]..............\n");
-      Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-      delay(5000); 
+//       SerialUSB.println("Attempting Reconnection [3 of 3]..............\n");
+//       Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
       
-      if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
-        SerialUSB.println("Reconnection to Gateway Successful");
-        Connection_status=1;
-        return;
-      }else{
-
-        SerialUSB.println("Reconnection to Gateway Failed");
-        SerialUSB.println();
-        SerialUSB.println("Max attempts reached");
-        Connection_status=0;}
-    }
-  }
-};
+//       if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+//         SerialUSB.println("Reconnection to Gateway Successful");
+//         Connection_status=1;
+//         return;
+//       }else{
+//         SerialUSB.println("Reconnection to Gateway Failed");
+//         SerialUSB.println();
+//         SerialUSB.println("Max attempts reached");
+//         Connection_status=0;}
+//     }
+//   }
+// };
