@@ -134,7 +134,7 @@ String sendData(String command, unsigned long timeout, boolean debug)
     String response=""; 
     Serial1.println(command);
     unsigned long time = millis();
-    SerialUSB.print("about to");
+    
     while ((time + timeout)>millis())
     {
       

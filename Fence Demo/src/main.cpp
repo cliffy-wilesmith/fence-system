@@ -1,15 +1,8 @@
-        //Included Libraries  //DONT USE PIN 5 (reset pin)
+        //Included Libraries  //DONT USE PIN 5 (reset pin for lora module)
 
 #include <Arduino.h>
 #include <CayenneLPP.h>
 #include <iostream>
-
-       //Temperature
-
-#include <dht11.h>
-dht11 DHT;
-#define DHT11_PIN 10
-int chk;
 
 
         //DEBUG STATE
@@ -18,9 +11,9 @@ int chk;
 
         // Device Info
 
-#define DEVEUI "D896E0FF00000468"                                //set 
-#define APPEUI "70B3D57ED0041DA0"
-#define APPKEY "15993DDDAFFA0D7D32D515A419743EE6" 
+#define DEVEUI ""                                //set 
+#define APPEUI ""
+#define APPKEY "" 
 
      //test
 // #define DEVEUI "D896E0FF00000687"                                //set 
@@ -29,7 +22,7 @@ int chk;
 
         //Input Pins
 
-int SideSwitchPin_Right=9;
+int SideSwitchPin_Right=9;                          //set
 int SideSwitchPin_Left=8;
 
 int CentreSwitchPin_Right=7;
@@ -37,10 +30,10 @@ int CentreSwitchPin_Left=6;
 
       //Time Constants
 
-const long Still_alive_interval= 3600*(1000);    // in seconds *(milliseconds)       
+const long Still_alive_interval= 3600*(1000);    // in seconds *(milliseconds)     (set to 1 hour right now)  
 const long Alert_interval = 2*(1000);           // in seconds *(milliseconds)
-const long Display_interval = 1*(1000);        // in seconds *(milliseconds)
-const int Breach_duration=3*(1000);           // in seconds *(milliseconds)
+
+const int Breach_duration=2.4*(1000);           // in seconds *(milliseconds)
 
       //Time Variables
 
@@ -60,7 +53,8 @@ int LeftAlarm_currentState;
 
 int RightAlarm_lastState = LOW;
 int LeftAlarm_lastState=LOW;
-int BoxAlarm_currentState=LOW;                       
+
+int BoxAlarm_currentState=LOW;                       //Change when you install lid sensor                     
 int Alert_sent=LOW;
 
     //Connection Variables
@@ -73,11 +67,11 @@ String Send_check;
 
 CayenneLPP lpp(51);  //payloadd size
 int Status_code;
-int Trigger;
+int Trigger=13500;
 
       //Declare Custom Functions
 
-String sendData(String command, const int timeout, boolean debug);
+String sendData(String command, unsigned long timeout, boolean debug);
 void SendPayload(int msg);
 void UpdateState(String Side);
 void Reconnect();
@@ -114,25 +108,35 @@ void setup() {
 
                 // Connect to Gateway
 
-    SerialUSB.println("Connecting to Gateway......");
-    Connection_check = sendData("AT+CJOIN=1,0,10,1", 10000, false);           // join lorawan         every 10 seconds, 2 total attempts
+  Connection_check = sendData("AT+CJOIN=1,0,6,0", 6100, false);           // join lorawan         6 seconds, 1 total attempt
+  SerialUSB.println("Done......................................//////");
+  // SerialUSB.println(Connection_check);
 
-    delay(400);
-    if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
-        SerialUSB.println("Connection to Gateway Successful");
-        SerialUSB.println();
-        Connection_status=1;
+  if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+      SerialUSB.println("Connection to Gateway Successful");
+      SerialUSB.println();
+      Connection_status=1;
+      SerialUSB.println("Monitoring System Active with gateway connection");
 
-    }else{
-        SerialUSB.println("Connection to Gateway Failed");
-        SerialUSB.println();
-        Connection_status=0;}
+  }else{
+      SerialUSB.println("Connection to Gateway Failed");
+      SerialUSB.println();
+      Connection_status=0;
+      SerialUSB.println("Attempting Reconnection..............\n");
+      Connection_check = sendData("AT+CJOIN=1,0,6,0", 6100, false);          //try to reconnect      6 seconds, 1 total attempt  
 
-    SerialUSB.println("Monitoring System Active");               //start fence monitoring regardless of connection status
-    SerialUSB.println();
+      if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
+          SerialUSB.println("Reconnection to Gateway Successful");
+          Connection_status=1;
+          SerialUSB.println("Monitoring System Active with gateway connection");
+      }else{
+        SerialUSB.println("Reconnection to Gateway Failed \n");
+        SerialUSB.println("Max attempts reached");
+        Connection_status=0;
+        SerialUSB.println("Monitoring System Active WITHOUT gateway connection");}
   }
 
-
+}
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void loop() {
@@ -141,9 +145,9 @@ void loop() {
 
   SideSwitchVal_Right =digitalRead(SideSwitchPin_Right);           
   SideSwitchVal_Left =digitalRead(SideSwitchPin_Left); 
- 
+
   CentreSwitchVal_Right =digitalRead(CentreSwitchPin_Right);  
-  CentreSwitchVal_Left =digitalRead(CentreSwitchPin_Left); 
+  CentreSwitchVal_Left =digitalRead(CentreSwitchPin_Left);  
 
            //Sensor Logic         
 
@@ -172,7 +176,7 @@ if (LeftAlarm_currentState !=LeftAlarm_lastState)
   UpdateState("Left");}
   LeftAlarm_lastState = LeftAlarm_currentState;
 
-         //Send Alert Logic      
+         //Alert Logic      
              
 if (LeftAlarm_currentState == HIGH                                                     //sends alert after timer
     && Alert_sent == LOW 
@@ -302,6 +306,29 @@ String sendData(String command, const int timeout, boolean debug)
 }
 
 
+       // Send Data Function
+
+String sendData(String command, unsigned long timeout, boolean debug)
+{ 
+    String response=""; 
+    Serial1.println(command);
+    unsigned long time = millis();
+    
+    while ((time + timeout)>millis())
+    {
+      
+        while (Serial1.available())
+        {
+            char c = Serial1.read();
+            response += c;
+        }
+    }
+    if (debug) 
+    {
+        SerialUSB.print(response);
+    }
+    return response;
+}
             // Send Payload Function
 
 void SendPayload(int msg){
@@ -326,13 +353,6 @@ void SendPayload(int msg){
     }
 
     lpp.reset();                                           //Build Payload
-
-    //TEMP
-
-    chk = DHT.read(DHT11_PIN);
-    lpp.addTemperature(1,(DHT.temperature));
-    lpp.addRelativeHumidity(1,(DHT.humidity));
-
     lpp.addLuminosity(1,msg);
     
     int size = lpp.getSize();
@@ -343,16 +363,10 @@ void SendPayload(int msg){
     }
     char HEXpayload[51] = "";
 
-    // SerialUSB.println("\nSIZE TEMPERATURE");
-
-    // SerialUSB.println(DHT.temperature);
-    // SerialUSB.println(DHT.humidity);
-
-    // sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
-    sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3], payload[4], payload[5], payload[6], payload[7], payload[8], payload[9], payload[10]);  
-    
-    Send_check = sendData((String)HEXpayload, 2000, false);
-    delay(500);   
+    sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
+      
+    Send_check = sendData((String)HEXpayload, 3000, false);
+     
 
     if(Send_check.indexOf("OK+SEND") > 0){
       SerialUSB.println("\nSEND check OK");
@@ -369,11 +383,8 @@ void SendPayload(int msg){
         SerialUSB.println("RECV check FAILED");
         Connection_status=0;
         SerialUSB.println("Attempting Resend [1 of 1]..............\n");
-
-        Reconnect();
        
-        Send_check = sendData((String)HEXpayload, 2000, false);
-        delay(500);
+        Send_check = sendData((String)HEXpayload, 3000, false);
 
         if(Send_check.indexOf("OK+SEND") > 0){
         SerialUSB.println("\nSEND check OK");
@@ -384,7 +395,7 @@ void SendPayload(int msg){
 
         if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway   
         SerialUSB.println("\nRECV check OK, RESEND OK");
-        Connection_status=1;
+        Connection_status=0;
 
           }else{
 
@@ -397,8 +408,7 @@ void SendPayload(int msg){
 void Reconnect(){
 
   SerialUSB.println("Attempting Reconnection [1 of 3]..............\n");
-  Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt
-  delay(1000); 
+  Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);          //try to reconnect      every 10seconds,1 attempt 
 
   if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
     SerialUSB.println("Reconnection to Gateway Successful");
@@ -408,8 +418,8 @@ void Reconnect(){
   }else{
     SerialUSB.println("Reconnection to Gateway Failed \n");
     SerialUSB.println("Attempting Reconnection [2 of 3]..............\n");
-    Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-    delay(1000); 
+    Connection_check = sendData("AT+CJOIN=1,0,6,0", 10000, false);
+    
       
     if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
       SerialUSB.println("Reconnection to Gateway Successful");
@@ -420,15 +430,13 @@ void Reconnect(){
       SerialUSB.println("Reconnection to Gateway Failed \n");
       
       SerialUSB.println("Attempting Reconnection [3 of 3]..............\n");
-      Connection_check = sendData("AT+CJOIN=1,0,10,0", 5000, false);
-      delay(1000); 
+      Connection_check = sendData("AT+CJOIN=1,0,6,0", 20000, false);
       
       if(Connection_check.indexOf("Joined") > 0){                          // check if connected to Gateway
         SerialUSB.println("Reconnection to Gateway Successful");
         Connection_status=1;
         return;
       }else{
-
         SerialUSB.println("Reconnection to Gateway Failed");
         SerialUSB.println();
         SerialUSB.println("Max attempts reached");
