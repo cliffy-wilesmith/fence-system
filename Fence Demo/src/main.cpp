@@ -11,9 +11,13 @@
 
         // Device Info
 
-#define DEVEUI ""                                //set 
-#define APPEUI ""
-#define APPKEY "" 
+#define DEVEUI "70B3E57ED0042FA0"                                //set 
+#define APPEUI "70B3D57ED005A993"
+#define APPKEY "7E30727C2C2C0E8EC3DD89F6BA2B58A3" 
+
+        //Maximum number of payloads that can be stored in the buffer
+
+#define MAX_BUFFER_PAYLOADS 10
 
      //test
 // #define DEVEUI "D896E0FF00000687"                                //set 
@@ -31,7 +35,7 @@ int CentreSwitchPin_Left=6;
       //Time Constants
 
 const long Still_alive_interval= 3600*(1000);    // in seconds *(milliseconds)     (set to 1 hour right now)  
-const long Alert_interval = 2*(1000);           // in seconds *(milliseconds)
+const long Alert_interval = 30*(1000);           // in seconds *(milliseconds)
 
 const int Breach_duration=2.4*(1000);           // in seconds *(milliseconds)
 
@@ -39,7 +43,7 @@ const int Breach_duration=2.4*(1000);           // in seconds *(milliseconds)
 
 unsigned long startMillis_Right;
 unsigned long startMillis_Left;
-unsigned long previousMillis;
+unsigned long previousMillis = 0;
 
       //State Variables
 
@@ -66,6 +70,8 @@ String Send_check;
     //Payload Variables
 
 CayenneLPP lpp(51);  //payloadd size
+char payloadBuffer[MAX_BUFFER_PAYLOADS][51]; //payload buffer can store 10 payloads of size 51
+int payloadBufferIndex = 0;
 int Status_code;
 int Trigger=13500;
 
@@ -134,6 +140,12 @@ void setup() {
         SerialUSB.println("Max attempts reached");
         Connection_status=0;
         SerialUSB.println("Monitoring System Active WITHOUT gateway connection");}
+  }
+
+
+              //initialise buffer with zeros just so we know whats in it initialially
+  for(int i = 0; i < MAX_BUFFER_PAYLOADS; i++){
+    strcpy(payloadBuffer[i], "0");
   }
 
 }
@@ -282,30 +294,6 @@ void UpdateState(String Side){
     }
 }
 
-
-         // Send Data Function
-
-String sendData(String command, const int timeout, boolean debug)
-{ 
-    String response=""; 
-    Serial1.println(command);
-    long int time = millis();
-    while ((time + timeout) > millis())
-    {
-        while (Serial1.available())
-        {
-            char c = Serial1.read();
-            response += c;
-        }
-    }
-    if (debug) 
-    {
-        SerialUSB.print(response);
-    }
-    return response;
-}
-
-
        // Send Data Function
 
 String sendData(String command, unsigned long timeout, boolean debug)
@@ -336,20 +324,6 @@ void SendPayload(int msg){
     if (DEBUG) {
         SerialUSB.print("ALERT, Sending Status_code: ");
         SerialUSB.println(msg);
-
-
-    if (Connection_status==0){                                                           //check if connected to gateway
-      SerialUSB.println("\n NOT CONNECTED to Gateway \n");
-      Reconnect();                                                                           //try to reconnect
-
-       if (Connection_status==0){                     //Checking Reconnect
-        SerialUSB.println("ALERT Can NOT be SENT");
-        return;}
-
-       if (Connection_status==1){
-        SerialUSB.println("Attempting to send msg");
-        }
-      }
     }
 
     lpp.reset();                                           //Build Payload
@@ -364,45 +338,94 @@ void SendPayload(int msg){
     char HEXpayload[51] = "";
 
     sprintf(HEXpayload,"AT+DTRX=1,2,%d,%02x%02x%02x%02x",size, payload[0], payload[1], payload[2], payload[3]);
-      
-    Send_check = sendData((String)HEXpayload, 3000, false);
-     
 
-    if(Send_check.indexOf("OK+SEND") > 0){
-      SerialUSB.println("\nSEND check OK");
+    if (Connection_status==0){                                                           //check if connected to gateway
+      SerialUSB.println("\n NOT CONNECTED to Gateway \n");
+      Reconnect();                                                                           //try to reconnect
 
-    }else{
-        SerialUSB.println("SEND check FAILED");
-        }        
+       if (Connection_status==0){                     //Checking Reconnect
+        SerialUSB.println("ALERT Can NOT be SENT, STORING message instead");
+        strcpy(payloadBuffer[payloadBufferIndex], HEXpayload);
+        payloadBufferIndex++;
+        SerialUSB.print("increased index (storing payload instead of transmitting)");
 
-    if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway   
-        SerialUSB.println("\nRECV check OK");
-        Connection_status=1;
-
-    }else{
-        SerialUSB.println("RECV check FAILED");
-        Connection_status=0;
-        SerialUSB.println("Attempting Resend [1 of 1]..............\n");
-       
-        Send_check = sendData((String)HEXpayload, 3000, false);
-
-        if(Send_check.indexOf("OK+SEND") > 0){
-        SerialUSB.println("\nSEND check OK");
-
-        }else{
-        SerialUSB.println("SEND check FAILED AGAIN");
-              }        
-
-        if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway   
-        SerialUSB.println("\nRECV check OK, RESEND OK");
-        Connection_status=0;
-
-          }else{
-
-            SerialUSB.println("\nRESEND FAILED Max attempts reached ");   
-            }
+        return;
         }
 
+       if (Connection_status==1){
+        SerialUSB.println("Attempting to send msg");
+        }
+      }
+    
+    strcpy(payloadBuffer[payloadBufferIndex], HEXpayload);
+    payloadBufferIndex++;
+    SerialUSB.println("increased index (transmitting payload )");
+
+    //for loop to send all payloads that have built up
+    for(int i = 0; i<payloadBufferIndex; i++){
+      Send_check = sendData((String)payloadBuffer[i], 3000, false);
+
+
+      //for debug purposes
+      /*SerialUSB.print("payloadBuffer for:");
+      SerialUSB.print(i);
+      SerialUSB.print(" is:");
+      SerialUSB.println(payloadBuffer[i]);*/
+
+      if(Send_check.indexOf("OK+SEND") > 0){
+        SerialUSB.println("\nSEND check OK");
+
+      }else{
+          SerialUSB.println("SEND check FAILED");
+          }        
+
+      if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway   
+          SerialUSB.println("\nRECV check OK");
+          Connection_status=1;
+          strcpy(payloadBuffer[i], "0");
+      }else{
+          SerialUSB.println("RECV check FAILED");
+          Connection_status=0;
+          SerialUSB.println("Attempting Resend [1 of 1]..............\n");
+        
+          Send_check = sendData((String)payloadBuffer[i], 3000, false);
+
+          if(Send_check.indexOf("OK+SEND") > 0){
+          SerialUSB.println("\nSEND check OK");
+
+          }else{
+          SerialUSB.println("SEND check FAILED AGAIN");
+                }        
+
+          if(Send_check.indexOf("OK+RECV") > 0){                          // check if connected to Gateway   
+          SerialUSB.println("\nRECV check OK, RESEND OK");
+          Connection_status=1;
+          strcpy(payloadBuffer[i], "0");
+
+            }else{
+
+              SerialUSB.println("\nRESEND FAILED Max attempts reached ");   
+              }
+          }
+
+    }
+
+  payloadBufferIndex = 0;
+  
+  for(int j = 0; j<MAX_BUFFER_PAYLOADS; j++){
+
+    if(payloadBuffer[j][0] == 'A'){
+      strcpy(payloadBuffer[payloadBufferIndex], payloadBuffer[j]);
+      payloadBufferIndex++;
+      /*SerialUSB.println("increased index (buffer shuffler)");
+      SerialUSB.println(payloadBuffer[j]); 
+      SerialUSB.print("j is:"); 
+      SerialUSB.println(j);
+      SerialUSB.print("BufferIndex is:"); 
+      SerialUSB.print(payloadBufferIndex);*/ 
+
+    }
+  }
 }
 
 void Reconnect(){
